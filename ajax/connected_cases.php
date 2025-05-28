@@ -1,0 +1,291 @@
+<?php
+
+/*  ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);  */
+include("../db_inc1.php");
+date_default_timezone_set("Asia/Kolkata");
+
+if($_SESSION['user'] !='' and $_SESSION['location'] !='')
+{
+	$location_id = $_SESSION['location'];
+	$schemas=htmlspecialchars($_SESSION['schema_name']);
+	$sessionUserType=htmlspecialchars($_SESSION['id']);
+	$curYear = htmlspecialchars(date("Y"));
+	$curMonth = htmlspecialchars(date("m"));
+	$curDay = htmlspecialchars(date("d"));
+	$cur_date = "$curYear-$curMonth-$curDay";
+	$cur_date1 ="$curDay/$curMonth/$curYear";
+	
+
+
+	function get_form($db,$schemas,$type,$location_id){
+		$bench = get_bench($db,$location_id);
+		if($type == 1){
+			$case_types = get_case_types($db,$display = 'T');
+			$final_data = json_encode(array('type'=>$type,'bench'=>$bench,'case_types'=>$case_types));
+		}else if($type == 2){
+			$final_data = json_encode(array('type'=>$type,'bench'=>$bench));
+		}else{
+		$final_data = '';
+		}
+		return $final_data;
+	}
+	
+	function get_bench($db,$location_id){
+		$bench = $db->prepare("select city_name,city_id,schema_name from mater_location_city where city_id = ?");
+		$bench->bindParam(1, $location_id, PDO::PARAM_STR);
+		$bench->execute();
+		return $bench->fetchAll();
+	}
+	
+	function get_case_types($db,$display){
+		$case_types = $db->prepare("select * from case_type where display = ? and id in (1) order by id");
+		$case_types->bindParam(1, $display, PDO::PARAM_STR);
+		$case_types->execute();
+		return $case_types->fetchAll();
+	}
+	
+	function check_case_in_case_detail($db,$schemas,$status,$filing_no='',$case_type='',$case_year='',$case_no=''){
+		if($filing_no == ''){
+		$get_data = $db->prepare("select a.filing_no,a.pet_name,a.res_name,a.case_no,a.case_year,a.case_type,a.status,ct.case_type_desc from 
+		$schemas.case_detail as a left join case_type as ct on ct.id = a.case_type where a.case_type = ? AND a.case_year = ? AND a.case_no = ?");
+		$get_data->bindParam(1, $case_type, PDO::PARAM_STR);
+		$get_data->bindParam(2, $case_year, PDO::PARAM_STR);
+		$get_data->bindParam(3, $case_no, PDO::PARAM_STR);
+		//$get_data->bindParam(4, $status, PDO::PARAM_STR);
+		}else{
+		$get_data = $db->prepare("select a.filing_no,a.pet_name,a.res_name,a.case_no,a.case_year,a.case_type,a.status,ct.case_type_desc from 
+					$schemas.case_detail as a left join case_type as ct on ct.id = a.case_type where a.filing_no = ?");
+		$get_data->bindParam(1, $filing_no, PDO::PARAM_STR);
+		//$get_data->bindParam(2, $status, PDO::PARAM_STR);
+		}
+		$get_data->execute();
+		$data = $get_data->fetchAll();
+		return array_shift($data);
+	}
+	
+	function get_connected_disconnected_cases($db,$schemas,$filing_no,$flag=''){
+		if($flag == ''){
+			$query = "select a.*,b.case_no,b.case_year,b.case_type,b.location_code,c.short_name as city_short_name,d.case_type_desc as case_type_short_name
+					from $schemas.connected_cases as a 
+					left join $schemas.case_detail as b on b.filing_no = a.conn_filing_no
+					left join mater_location_city as c on c.city_id = b.location_code
+					left join case_type as d on d.id = b.case_type where a.filing_no = ?";
+			$cases = $db->prepare($query);
+			$cases->bindParam(1, $filing_no, PDO::PARAM_STR);
+		}else{
+			$query = "select a.*,b.case_no,b.case_year,b.case_type,b.location_code,c.short_name as city_short_name,d.case_type_desc as case_type_short_name
+					from $schemas.connected_cases as a 
+					left join $schemas.case_detail as b on b.filing_no = a.conn_filing_no
+					left join mater_location_city as c on c.city_id = b.location_code
+					left join case_type as d on d.id = b.case_type where a.filing_no = ? and a.status = ?";
+			$cases = $db->prepare($query);
+			$cases->bindParam(1, $filing_no, PDO::PARAM_STR);
+			$cases->bindParam(2, $flag, PDO::PARAM_STR);
+		}
+
+		$cases->execute();
+		return $cases->fetchAll();
+	}
+	
+	function check_if_case_already_connected($db,$schemas,$filing_no,$main_filing_no,$status = 'C'){
+		$query = "select * from $schemas.connected_cases where conn_filing_no = ? and status = ? and filing_no = ?";
+		$cases = $db->prepare($query);
+		$cases->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$cases->bindParam(2, $status, PDO::PARAM_STR);
+		$cases->bindParam(3, $main_filing_no, PDO::PARAM_STR);
+		$cases->execute();
+		return $cases->fetchAll();
+	}
+	
+	function connect_case($db,$schemas,$main_filing_no,$conn_filing_no,$cur_date,$sessionUserType){
+		$display='1';
+		$status='C';
+		$query = "insert into $schemas.connected_cases(filing_no,conn_filing_no,status,display,today_date,user_id) values(?,?,?,?,?,?)";
+		$cases = $db->prepare($query);
+		$cases->bindParam(1, $main_filing_no, PDO::PARAM_STR);
+		$cases->bindParam(2, $conn_filing_no, PDO::PARAM_STR);
+		$cases->bindParam(3, $status, PDO::PARAM_STR);
+		$cases->bindParam(4, $display, PDO::PARAM_STR);
+		$cases->bindParam(5, $cur_date, PDO::PARAM_STR);
+		$cases->bindParam(6, $sessionUserType, PDO::PARAM_STR);
+		$ex = $cases->execute();
+		return $ex; 
+	}
+	
+	function disconnect_case($db,$schemas,$id,$main_filing_no,$conn_filing_no,$cur_date){
+		$status = 'D';
+		//echo "update $schemas.connected_cases set status = '$status', modify_date = now() where filing_no = '$main_filing_no' and conn_filing_no = '$conn_filing_no' and id = '$id'"; die;
+		$query = "update $schemas.connected_cases set status = ?, modify_date = now() where filing_no = ? and conn_filing_no = ? and id = ?";
+		$cases = $db->prepare($query);
+		$cases->bindParam(1, $status, PDO::PARAM_STR);
+		//$cases->bindParam(2, $cur_date, PDO::PARAM_STR);
+		$cases->bindParam(2, $main_filing_no, PDO::PARAM_STR);
+		$cases->bindParam(3, $conn_filing_no, PDO::PARAM_STR);
+		$cases->bindParam(4, $id, PDO::PARAM_STR);
+		$ex = $cases->execute();
+		return $ex;
+	}
+
+	function get_listing_data($db,$schemas,$filing_no){
+		$query = "select count(*) from $schemas.case_allocation  where filing_no = ?";
+		$cases = $db->prepare($query);
+		$cases->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$cases->execute();
+		return $cases->fetchColumn();
+	}
+	
+	
+	
+	if(isset($_POST['type']) && $_POST['type'] == "get_form"){
+		echo get_form($db,$schemas,$_POST['search_type'],$location_id);
+	} 
+	
+	if(isset($_POST['type']) && $_POST['type'] == "get_connected_cases"){
+		$dynamic_param = $_POST['dynamic_param'];
+		$data = $_POST['form_data'];
+		$location_id = $data['location_id'];
+		$get_city = get_bench($db,$location_id);
+		$get_city = array_shift($get_city);
+		$schema_name = $get_city['schema_name'];
+		$main_filing_no = $_POST['main_filing_no'];
+		$type = $_POST['con_type'];
+
+		
+		if($data['search_type'] == 2){
+			$filing_no = trim($data['filing_no']);
+			$case_detail = check_case_in_case_detail($db,$schemas,$status='P',$filing_no);
+			if(empty($case_detail)){
+				$error_msg = json_encode(array("status"=>"error","msg"=>"Case does not exist or case is disposed"));
+				echo $error_msg; die;
+			}
+		}
+		if($data['search_type'] == 1){
+			$dispose_found = $not_found= $already_connected_found = 0;
+			$filing_no_array = array();
+			$case_detail_array = $disposed_array = array();
+			$not_exists = 'Cases does not exist are : ';
+			$disposed = 'Cases disposed are : ';
+			$already_connected = 'Cases already connected with this case no are : ';
+			$case_type = $data['case_type'];
+			$case_nos = $data['case_no'];
+			$case_no_array = explode(',',$case_nos);
+			$case_year = $data['case_year'];
+			foreach($case_no_array as $k=>$case_no){
+			$case_detail = check_case_in_case_detail($db,$schemas,$status='P',$filing_no='',$case_type,$case_year,$case_no);
+			if(!empty($case_detail) && $_SESSION['menuaccess_codeall'] != '11'){
+				$is_listed = get_listing_data($db,$schemas,$case_detail['filing_no']);
+				if(!$is_listed){
+					$final_data = array("status"=>"success","main_case"=>[],"connected_cases"=>[],"type"=>$type,'msg'=>"You can't connect this case as case is not listed once");
+					echo json_encode($final_data); die;
+				}
+			}
+			if(empty($case_detail)){
+				$not_found = 1;
+				$not_exists .= $case_no.'/'.$case_year.', ';
+				$error_msg = array("status"=>"error","msg"=>"Case does not exist");
+				//echo $error_msg; die;
+			}else if(!empty($case_detail) && $case_detail['status'] == 'D' && $type != 'dis'){
+
+					$dispose_found = 1;
+				 	$disposed .= $case_no.'/'.$case_year.', ';
+				 	$error_msg = array("status"=>"error","msg"=>"Case is disposed");
+				 
+			}else if($dynamic_param == '_second'){
+				$check_if_already_connected = check_if_case_already_connected($db,$schema_name,$case_detail['filing_no'],$main_filing_no);
+				if(!empty($check_if_already_connected)){
+					$already_connected_found = 1;
+				    $already_connected .= $case_no.'/'.$case_year.', ';
+				    $error_msg = array("status"=>"error","msg"=>"Case is already connected to this case no");
+				}else{
+					$filing_no_array[] = $case_detail['filing_no'];
+					$case_detail_array[] = $case_detail;
+				}
+				
+
+			}else {
+				$filing_no_array[] = $case_detail['filing_no'];
+				$case_detail_array[] = $case_detail;
+			}
+			
+		 }
+		 if($not_found == '1' && $dispose_found == '1' && $already_connected_found == '1'){
+			$msg = $not_exists.' '.$disposed.' '.$already_connected;
+		 }else if($not_found == '1' && $dispose_found == '1' && $already_connected_found == '0'){
+			$msg = $not_exists.' '.$disposed;
+		 }else if($not_found == '1' && $dispose_found == '0' && $already_connected_found == '1'){
+			$msg = $not_exists.' '.$already_connected;
+		 }else if($not_found == '1' && $dispose_found == '0' && $already_connected_found == '0'){
+			$msg = $not_exists;
+		 }else if($not_found == '0' && $dispose_found == '1' && $already_connected_found == '1'){
+			$msg = $disposed.' '.$already_connected;
+		 }else if($not_found == '0' && $dispose_found == '1' && $already_connected_found == '0'){
+			$msg = $disposed;
+		 }else if($not_found == '0' && $dispose_found == '0' && $already_connected_found == '1'){
+			$msg = $already_connected;
+		 }else{
+			$msg = '';
+		 }
+		}
+		 if($dynamic_param == '_second'){
+			/* $check_if_already_connected = check_if_case_already_connected($db,$schema_name,$filing_no,$main_filing_no);
+			if(!empty($check_if_already_connected)){
+				$error_msg = json_encode(array("status"=>"error","msg"=>"This Case Is Already Connected"));
+				echo $error_msg; die;
+			} */
+			
+
+		} else {
+
+			$msg = (!empty($error_msg))?$error_msg['msg']:'';
+			$case_detail_array = $case_detail_array[0];
+		}
+		//echo "<pre>"; print_r($case_detail_array); die;
+		if(empty($main_filing_no)){
+			$main_filing_no = $filing_no_array[0];
+		}
+		
+		$cases = get_connected_disconnected_cases($db,$schema_name,$main_filing_no,$flag='C');
+		
+		$final_data = array("status"=>"success","main_case"=>$case_detail_array,"connected_cases"=>$cases,"type"=>$type,'msg'=>$msg);
+		echo json_encode($final_data); die;
+	} 
+	
+	if(isset($_POST['type']) && $_POST['type'] == "connect_case"){
+		$connected = 0;
+		$main_filing_no = $_POST['main_filing_no'];
+		$conn_filing_nos = $_POST['conn_filing_no'];
+		$conn_filing_nos = explode(',',$conn_filing_nos);
+		if($main_filing_no == '' || $conn_filing_nos == ''){
+			echo json_encode(array("status"=>"error","msg"=>"Please fill all details")); die;
+		}else{
+			foreach($conn_filing_nos as $k=>$conn_filing_no){
+			$c_case = connect_case($db,$schemas,$main_filing_no,$conn_filing_no,$cur_date,$sessionUserType);
+			if($c_case){
+			$connected = 1;
+			}else{
+			echo json_encode(array("status"=>"error","msg"=>"Some Error Occured")); die;
+			}
+			}
+			if($connected == '1'){
+				echo json_encode(array("status"=>"success","msg"=>"Case connected")); die;
+			}
+		}
+	} 
+	
+	if(isset($_POST['type']) && $_POST['type'] == "disconnect_case"){
+		$main_filing_no = $_POST['main_filing_no'];
+		$conn_filing_no = $_POST['conn_filing_no'];
+		$id = $_POST['id'];
+		$disconnect_case_res = disconnect_case($db,$schemas,$id,$main_filing_no,$conn_filing_no,$cur_date);
+		if($disconnect_case_res){
+			echo json_encode(array("status"=>"success","msg"=>"Case Disconnected")); die;
+		}else{
+			echo json_encode(array("status"=>"error","msg"=>"Some Error Occured")); die;
+		}
+	} 
+	
+}
+
+?>

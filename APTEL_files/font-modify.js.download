@@ -1,0 +1,64 @@
+
+        $(document).ready(function () {
+            var originalFontSize = $('html').css('font-size');
+            var rtext = 0;
+            var rstatusdec = 0;
+            var rstatusinc = 0;
+
+            // Increasing the Font Size
+            $("body").delegate(".increaseFont", "click", function () {
+                if (rtext < 2) {
+                    rtext = rtext + 1;
+                    $("span, li, a, p, h1, h2, h3, h4 ").each(function (index, element) {
+                        var currentFontSize = $(element).css("font-size");
+                        var currentFontSizeNum = parseFloat(currentFontSize, 10);
+                        var newFontSize = currentFontSizeNum + 1;
+                        var nF = newFontSize + 'px';
+                        var spstatus = 0;
+                        var cnt = 0;
+                        var parents = $(this).parents();
+
+                        for (var i = 0; i < parents.length; i++) {
+                            if ($(parents[i]).is("span") && !($(this).is("a")))
+                                spstatus = 1;
+                        }
+                        if (spstatus == 0) {
+                            $(element).css('font-size', nF);
+                        }
+                        if (newFontSize == 14) {
+                            $('.navigation ul li.paddi').css('padding', '1px 21px 1px 20px');
+                        }
+                        else if (newFontSize == 15) {
+                            $('.navigation ul li.paddi').css('padding', '1px 24px 1px 24px');
+                        }
+
+                    });
+                }
+
+                return false;
+            });
+
+            // Decreasing Font Size
+            $("body").delegate(".decreaseFont", "click", function () {
+                if (rtext > -1) {
+                    rtext = rtext - 1;
+                    $("span, li, a, p, h1, h2, h3, h4 ").each(function (index, element) {
+                        var currentFontSize = $(element).css("font-size");
+                        var currentFontSizeNum = parseFloat(currentFontSize, 10);
+                        var newFontSize = currentFontSizeNum - 1;
+                        var nF = newFontSize + 'px';
+                        var spstatus = 0;
+                        var cnt = 0;
+                        var parents = $(this).parents();
+                        for (var i = 0; i < parents.length; i++) {
+                            if ($(parents[i]).is("span") && !($(this).is("a")))
+                                spstatus = 1;
+                        }
+                        if (spstatus == 0) {
+                            $(element).css('font-size', nF);
+                        }
+                    });
+                }
+                return false;
+            });
+        });

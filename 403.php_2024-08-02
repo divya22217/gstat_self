@@ -1,0 +1,109 @@
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Page not found</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Uttar Pradesh Real Estate Appellate Tribunal - Government of Uttar Pradesh" />
+    <meta name="keywords" content="UPREAT, Real Estate Appellate Tribunal, eFiling" />
+    <meta name="author" content="National Informatics Centre" />
+    <link rel="shortcut icon" href="favicon.ico" />
+    <link rel="stylesheet" href="assets/css/bootstrap.css">
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/newstyle.css">
+    <link rel="stylesheet" href="assets/css/custom.css" />
+    <link rel="stylesheet" href="./bower_components/font-awesome/css/font-awesome.min.css">
+    <script type="text/javascript" src="assets/js/modernizr.custom.js"></script>
+    <script type="text/javascript" src="utf8_encode.js"></script>
+    <script src="sha256.js" language="javascript"></script>
+
+    <style>
+    body {
+        background-color: #ecf0f5 !important;
+    }
+
+    .main_wrapper {
+        height: auto;
+    }
+
+    .container.content-page {
+        display: flex;
+        justify-content: center;
+    }
+
+    .text-layout {
+        text-align: center;
+        justify-content: center;
+        display: flex;
+        align-items: center;
+        flex-direction: column;
+        width: 100%;
+        padding: 50px 0;
+    }
+
+    i.icon {
+        font-size: 150px;
+        color: #e79f4f;
+        font-style: normal;
+    }
+
+    .content-page h1.heading {
+        font-size: 26px;
+        margin-top: 0px;
+        margin-bottom: 0px;
+    }
+
+    .field-content {
+        margin-bottom: 20px;
+    }
+
+    @media (max-width:1024px) {
+        .flinks {
+            margin-top: 132px;
+        }
+    }
+
+    @media (max-width:667px) {
+        header {
+            position: static;
+        }
+
+        .top-band {
+            position: static;
+        }
+
+        .flinks {
+            margin-top: 0px;
+        }
+
+        footer {
+            position: static;
+        }
+    }
+    </style>
+</head>
+
+<body>
+
+    <?php
+    $main_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'];
+    $url = $main_url . '/nclat/';
+    ?>
+
+
+    <div class="main_wrapper">
+        <div class="container content-page">
+            <div id="content" class="text-layout" role="main">
+                <h1 class="heading"><i class="icon">403</i></h1>
+                <div class="field-content">
+                    <h2>Forbidden Access</h2>
+                    <p>The page you are looking for doesn't have permission to access this file</p>
+                </div>
+                <a href="<?php echo $url; ?>" class="btn btn-secondary text-white">Go to Homepage</a>
+            </div>
+        </div>
+
+
+
+
+
+</body>

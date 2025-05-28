@@ -1,0 +1,1868 @@
+<?php
+/*  ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);    */
+include("../db_inc1.php");
+include("../db_inc2.php");
+include '../pdftotext/autoload.php';
+$parser = new \Smalot\PdfParser\Parser();
+date_default_timezone_set("Asia/Kolkata");
+$schema = htmlspecialchars($_SESSION['schema_name']);
+$location_name = strtoupper($schema);
+if ($_SESSION['user'] != '' and $_SESSION['location'] != '') {
+
+	$location_id = $_SESSION['location'];
+	$sessionUserType = htmlspecialchars($_SESSION['id']);
+	$username = $_SESSION['user_actual_name'];
+	$ip = htmlspecialchars($_SERVER["REMOTE_ADDR"]);
+
+	function bench_judges($db, $schema, $judge_code = '')
+	{
+		//$display = 'TRUE';
+		if ($judge_code == '')
+			$query = "select * from $schema.master_judge order by judge_code";
+		else
+			$query = "select * from $schema.master_judge where judge_code = '$judge_code'";
+		$bench_nature = $db->prepare($query);
+		//$bench_nature->bindParam(1, $display, PDO::PARAM_INT);
+		$bench_nature->execute();
+		$bench_nature = $bench_nature->fetchAll();
+		return $bench_nature;
+	}
+
+	function search_case($dbonline, $filing_no, $case_type)
+	{
+		$case_detail = array();
+		if ($case_type == 4 || $case_type == 1) {
+			$case_detail = get_title($dbonline, $filing_no, $case_type);
+		} else {
+			$main_case_filing_no = $dbonline->prepare("select filing_no,filed_date::timestamp::date as filed_date from case_detail_ma_ia where filing_no_ia_ma=? and case_type = ?");
+			$main_case_filing_no->bindParam(1, $filing_no, PDO::PARAM_STR);
+			$main_case_filing_no->bindParam(2, $case_type, PDO::PARAM_STR);
+			$main_case_filing_no->execute();
+			$main_case_filing_no = $main_case_filing_no->fetchAll();
+			$main_case_filing_no = array_shift($main_case_filing_no);
+			if (empty($main_case_filing_no)) {
+				return $case_detail;
+			}
+			$case_detail = get_title($dbonline, $main_case_filing_no['filing_no'], $case_type, $filing_no, $main_case_filing_no['filed_date']);
+		}
+		return $case_detail;
+	}
+
+	function get_title($dbonline, $filing_no, $case_type, $ia_filing_no = '', $ia_ma_dt_of_filing = '')
+	{
+		$case_detail = array();
+		if ($ia_filing_no != '') {
+			$case_info = $dbonline->prepare("select pet_code,res_code,dt_of_filing from e_case_detail where filing_no=? and case_type in (1,4)");
+			$case_info->bindParam(1, $filing_no, PDO::PARAM_INT);
+		} else {
+			$case_info = $dbonline->prepare("select pet_code,res_code,dt_of_filing from e_case_detail where filing_no=? and case_type = ?");
+			$case_info->bindParam(1, $filing_no, PDO::PARAM_INT);
+			$case_info->bindParam(2, $case_type, PDO::PARAM_INT);
+		}
+		$case_info->execute();
+		$case_info = $case_info->fetchAll();
+		if (!empty($case_info)) {
+			$case_info = array_shift($case_info);
+			//echo "<pre>"; print_r($case_info); die;
+			$pet_code = $case_info['pet_code'];
+			$res_code = $case_info['res_code'];
+			$case_detail['filing_no'] = $filing_no;
+			if ($ia_filing_no != '') {
+				$case_detail['dt_of_filing'] = $dt_of_filing = $ia_ma_dt_of_filing;
+			} else {
+				$case_detail['dt_of_filing'] = $dt_of_filing = $case_info['dt_of_filing'];
+			}
+			$case_detail['pet_name'] = $pet_name = get_party_name($dbonline, $filing_no, $pet_code);
+			$case_detail['res_name'] = $res_name = get_party_name($dbonline, $filing_no, $res_code);
+			$case_detail['ia_filing_no'] = $ia_filing_no;
+		}
+		return $case_detail;
+	}
+
+	function get_order_text($parser, $path)
+	{
+
+		try {
+			$order_pdf  = $parser->parseFile($path);
+			$order_text = $order_pdf->getText();
+		} catch (Exception $e) {
+			$order_text = 'NA';
+		} finally {
+			if ($order_text == '') {
+				$order_text = 'NA';
+			}
+		}
+		return $order_text;
+	}
+
+	function get_party_name($dbonline, $filing_no, $party_code)
+	{
+		$party_name = $dbonline->prepare("select name from e_cases_party where filing_no = ? and id = ?");
+		$party_name->bindParam(1, $filing_no, PDO::PARAM_INT);
+		$party_name->bindParam(2, $party_code, PDO::PARAM_INT);
+		$party_name->execute();
+		$party_name = $party_name->fetchColumn();
+		return $party_name;
+	}
+
+	function check_if_case_exists($schema, $db, $case_no, $case_year, $case_type)
+	{
+		$check_case = $db->prepare("select count(*) as count from $schema.case_detail where case_no = ? and case_year = ? and case_type = ?");
+		$check_case->bindParam(1, $case_no, PDO::PARAM_INT);
+		$check_case->bindParam(2, $case_year, PDO::PARAM_INT);
+		$check_case->bindParam(3, $case_type, PDO::PARAM_INT);
+		$check_case->execute();
+		$check_case = $check_case->fetchColumn();
+		return (int)$check_case;
+	}
+
+	function check_if_action_completed($db, $filing_no, $column, $scrutiny_flag)
+	{
+		$check_scrutiny = $db->prepare("select * from update_cases where filing_no = ? and $column = ?");
+		$check_scrutiny->bindParam(1, $filing_no, PDO::PARAM_INT);
+		$check_scrutiny->bindParam(2, $scrutiny_flag, PDO::PARAM_INT);
+		$check_scrutiny->execute();
+		$check_scrutiny = $check_scrutiny->fetchAll();
+		if (!empty($check_scrutiny)) {
+			$check_scrutiny = array_shift($check_scrutiny);
+		}
+		return $check_scrutiny;
+	}
+
+	/* function get_case_detail($dbonline,$filing_no,$case_type){
+		if($case_type == 1 || $case_type == 4){
+		$case_detail = $dbonline->prepare("select * from e_case_detail where filing_no = ?");
+		}else{
+		$case_detail = $dbonline->prepare("select * from case_detail_ma_ia where filing_no_ia_ma = ?");	
+		}
+		$case_detail->bindParam(1, $filing_no, PDO::PARAM_INT);
+		$case_detail->execute();
+		$case_detail = $case_detail->fetchAll();
+		return $case_detail;
+	} */
+
+	function get_dt_of_filing($dbonline, $filing_no, $case_type)
+	{
+		if ($case_type == 1 || $case_type == 4) {
+			$case_detail = $dbonline->prepare("select dt_of_filing from e_case_detail where filing_no = ?");
+		} else {
+			$case_detail = $dbonline->prepare("select filed_date::timestamp::date as dt_of_filing from case_detail_ma_ia where filing_no_ia_ma = ?");
+		}
+		$case_detail->bindParam(1, $filing_no, PDO::PARAM_INT);
+		$case_detail->execute();
+		$case_detail = $case_detail->fetchColumn();
+		return $case_detail;
+	}
+
+
+	function update_cases($db, $filing_no)
+	{
+		$case_detail = $db->prepare("select * from update_cases where filing_no = ?");
+		$case_detail->bindParam(1, $filing_no, PDO::PARAM_INT);
+		$case_detail->execute();
+		$case_detail = $case_detail->fetchAll();
+		return $case_detail;
+	}
+
+	function search_case_in_update_cases_by_case_no_and_case_year($db, $case_no, $case_year, $case_type, $location)
+	{
+		$case_detail = $db->prepare("select filing_no from update_cases where case_no = ? and case_year = ? and case_type = ? and location_id = ?");
+		$case_detail->bindParam(1, $case_no, PDO::PARAM_INT);
+		$case_detail->bindParam(2, $case_year, PDO::PARAM_INT);
+		$case_detail->bindParam(3, $case_type, PDO::PARAM_INT);
+		$case_detail->bindParam(4, $location, PDO::PARAM_INT);
+		$case_detail->execute();
+		$case_detail = $case_detail->fetchColumn();
+		return $case_detail;
+	}
+
+	function message($status, $msg)
+	{
+		return json_encode(array('status' => $status, 'msg' => $msg));
+	}
+
+	function  get_listing_info($db, $filing_no)
+	{
+		$query = "select a.filing_no,a.case_no,a.case_year,a.case_type,a.submission_status,a.is_reject,a.case_proceeding,b.* from update_cases as a 
+					join update_cases_listing as b on b.filing_no = a.filing_no
+					where a.filing_no = ? order by b.listing_date";
+		$listing_info = $db->prepare($query);
+		$listing_info->bindParam(1, $filing_no, PDO::PARAM_INT);
+		$listing_info->execute();
+		$listing_info = $listing_info->fetchAll();
+		return $listing_info;
+	}
+
+	function  get_listing_info_by_id($db, $filing_no, $id)
+	{
+		$query = "select * from update_cases_listing where filing_no = ? and id = ?";
+		$listing_info = $db->prepare($query);
+		$listing_info->bindParam(1, $filing_no, PDO::PARAM_INT);
+		$listing_info->bindParam(2, $id, PDO::PARAM_INT);
+		$listing_info->execute();
+		$listing_info = $listing_info->fetchAll();
+		return $listing_info;
+	}
+
+	function  get_last_listing_info($db, $filing_no)
+	{
+		$query = "select a.filing_no,a.case_no,a.case_year,a.case_type,b.* from update_cases as a 
+					join update_cases_listing as b on b.filing_no = a.filing_no
+					where a.filing_no = ? order by b.id desc limit 1";
+		$listing_info = $db->prepare($query);
+		$listing_info->bindParam(1, $filing_no, PDO::PARAM_INT);
+		$listing_info->execute();
+		$listing_info = $listing_info->fetchAll();
+		return $listing_info;
+	}
+
+
+	function listing_history_form($schema, $db, $dbonline, $filing_no)
+	{
+		$case_deails = update_cases($db, $filing_no);
+		if (!empty($case_deails)) {
+		}
+	}
+
+	function generate_case_no($db, $filing_no)
+	{
+		$case_no = '';
+		$case_detail = $db->prepare("select a.case_no,a.case_year,b.short_name as case_type_name,c.short_name as loc from update_cases as a
+										 left join case_type as b on b.id = a.case_type 
+										 left join mater_location_city as c on c.city_id = a.location_id where a.filing_no=?");
+		$case_detail->bindParam(1, $filing_no, PDO::PARAM_INT);
+		$case_detail->execute();
+		$case_detail = $case_detail->fetchAll();
+		if (!empty($case_detail)) {
+			$case_detail = array_shift($case_detail);
+			$case_no = $case_detail['case_type_name'] . '/' . $case_detail['case_no'] . '(' . $case_detail['loc'] . ")/" . $case_detail['case_year'];
+		}
+		return $case_no;
+	}
+
+	function update_submit_flag($db, $filing_no, $status, $reject_remark = '', $is_reject = 0)
+	{
+		$update = $db->prepare("update update_cases set submission_status = ? , reject_remark = ?, is_reject = ? where filing_no = ?");
+		$update->bindParam(1, $status, PDO::PARAM_STR);
+		$update->bindParam(2, $reject_remark, PDO::PARAM_STR);
+		$update->bindParam(3, $is_reject, PDO::PARAM_STR);
+		$update->bindParam(4, $filing_no, PDO::PARAM_STR);
+		$res = $update->execute();
+		return $res;
+	}
+
+	function get_master_judges($db, $schema)
+	{
+		$display = 'TRUE';
+		$master_judges = $db->prepare("select judge_code,judge_name from $schema.master_judge where display = ? order by judge_code");
+		$master_judges->bindParam(1, $display, PDO::PARAM_INT);
+		$master_judges->execute();
+		$master_judges = $master_judges->fetchAll();
+		return $master_judges;
+	}
+
+	// function started
+
+	function get_case_detail($db, $schema, $case_no, $case_year, $case_type, $location_id)
+	{
+		$case_detail = $db->prepare("select filing_no,status,dt_of_filing,pet_name,res_name,case_no,case_year,case_type,regis_date,main_case_ia_no from $schema.case_detail where case_type = ? and case_no = ? and case_year = ? and location_code = ?");
+		$case_detail->bindParam(1, $case_type, PDO::PARAM_INT);
+		$case_detail->bindParam(2, $case_no, PDO::PARAM_INT);
+		$case_detail->bindParam(3, $case_year, PDO::PARAM_INT);
+		$case_detail->bindParam(4, $location_id, PDO::PARAM_INT);
+		$case_detail->execute();
+		$case_detail = $case_detail->fetchAll();
+		return $case_detail;
+	}
+
+	function last_proceeding_info($db, $schema, $filing_no)
+	{
+		$last_listing_info = $db->prepare("select * from $schema.case_proceeding where filing_no = ? order by listing_date desc limit 1");
+		$last_listing_info->bindParam(1, $filing_no, PDO::PARAM_INT);
+		$last_listing_info->execute();
+		$last_listing_info = $last_listing_info->fetchAll();
+		return $last_listing_info;
+	}
+
+	function check_if_already_proceed($db, $schema, $filing_no, $listing_date, $court_no = '')
+	{
+		if ($court_no != '') {
+			$res = $db->prepare("select count(*) from $schema.case_proceeding where filing_no = ? and listing_date = ? and court_no = ?");
+		} else {
+			$res = $db->prepare("select count(*) from $schema.case_proceeding where filing_no = ? and listing_date = ?");
+		}
+		$res->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$res->bindParam(2, $listing_date, PDO::PARAM_STR);
+		if ($court_no != '') {
+			$res->bindParam(3, $court_no, PDO::PARAM_STR);
+		}
+		$res->execute();
+		$res = $res->fetchColumn();
+		return $res;
+	}
+
+	function display_date($date)
+	{
+		return date('d/m/Y', strtotime($date));
+	}
+
+	function get_short_name($db, $table, $search_column_name, $condtion_column_name, $condtion_column_value)
+	{
+		$short_name = $db->prepare("select $search_column_name from $table where $condtion_column_name = ? ");
+		$short_name->bindParam(1, $condtion_column_value, PDO::PARAM_INT);
+		$short_name->execute();
+		$short_name = $short_name->fetchColumn();
+		return $short_name;
+	}
+
+	function check_if_bench_exist($db, $schemas, $court_no, $listing_date, $bench_nature)
+	{
+		$query = "select * from $schemas.bench where from_list_date = ? and court_no = ? and bench_nature = ?";
+		$get_bench = $db->prepare($query);
+		$get_bench->bindParam(1, $listing_date, PDO::PARAM_STR);
+		$get_bench->bindParam(2, $court_no, PDO::PARAM_STR);
+		$get_bench->bindParam(3, $bench_nature, PDO::PARAM_STR);
+		$get_bench->execute();
+		$get_bench = $get_bench->fetchAll();
+		return $get_bench;
+	}
+
+	function get_coram($db, $schemas, $listing_date, $court_no, $bench_nature, $bench_no)
+	{
+		$query = "select judge_code from $schemas.bench_judge where from_list_date = ? and court_no = ? and bench_nature = ? and bench_no = ?";
+		$coram = $db->prepare($query);
+		$coram->bindParam(1, $listing_date, PDO::PARAM_STR);
+		$coram->bindParam(2, $court_no, PDO::PARAM_STR);
+		$coram->bindParam(3, $bench_nature, PDO::PARAM_STR);
+		$coram->bindParam(4, $bench_no, PDO::PARAM_STR);
+		$coram->execute();
+		$coram = $coram->fetchAll();
+		return $coram;
+	}
+
+	function create_bench($db, $schemas, $listing_date, $court_no, $bench_nature, $presiding_judge, $location_id, $limit_case = 90, $sessionUserType, $coram_judges, $entry_date)
+	{
+		$sql_max = "select max(bench_no) from $schemas.bench where from_list_date = ? ";
+		$sql_max = $db->prepare($sql_max);
+		$sql_max->bindParam(1, $listing_date, PDO::PARAM_STR);
+		$sql_max->execute();
+		$max_bench = $sql_max->fetchColumn();
+		if ($max_bench == '' || $max_bench == '0')
+			$max_bench = 1;
+		else
+			$max_bench = $max_bench + 1;
+		$from_time = '10:30 AM';
+		$bench_sql = $db->prepare("insert into $schemas.bench (bench_nature,
+		bench_no,court_no,from_list_date,to_list_date,presiding,entry_date,deal_cd,from_time,to_time,limit_case,location_code) values
+		(?,?,?,?,?,?,?,?,?,?,?,?)");
+
+		$bench_sql->bindParam(1, $bench_nature, PDO::PARAM_STR);
+		$bench_sql->bindParam(2, $max_bench, PDO::PARAM_STR);
+		$bench_sql->bindParam(3, $court_no, PDO::PARAM_STR);
+		$bench_sql->bindParam(4, $listing_date, PDO::PARAM_STR);
+		$bench_sql->bindParam(5, $listing_date, PDO::PARAM_STR);
+		$bench_sql->bindParam(6, $presiding_judge, PDO::PARAM_STR);
+		$bench_sql->bindParam(7, $entry_date, PDO::PARAM_STR);
+		$bench_sql->bindParam(8, $sessionUserType, PDO::PARAM_STR);
+		$bench_sql->bindParam(9, $from_time, PDO::PARAM_STR);
+		$bench_sql->bindParam(10, $from_time, PDO::PARAM_STR);
+		$bench_sql->bindParam(11, $limit_case, PDO::PARAM_STR);
+		$bench_sql->bindParam(12, $location_id, PDO::PARAM_STR);
+		$res = $bench_sql->execute();
+		if ($res) {
+			foreach ($coram_judges as $k => $v) {
+				$judge_code = $v;
+				if ($judge_code > 0) {
+					$ins_judge = $db->prepare("insert into $schemas.bench_judge (bench_no,judge_code,from_list_date,from_time,to_list_date,to_time,entry_date,deal_cd,bench_nature,court_no) values
+									(?,?,?,?,?,?,?,?,?,?)");
+					$ins_judge->execute(array(
+						$max_bench, $judge_code, $listing_date, $from_time,
+						$listing_date, $from_time, $entry_date, $sessionUserType, $bench_nature, $court_no
+					));
+				}
+			}
+
+			$query = "select * from $schemas.master_purpose order by purpose_priority";
+			$all_purpose = $db->prepare($query);
+			$all_purpose->execute();
+			$all_purpose = $all_purpose->fetchAll();
+			foreach ($all_purpose as $purpose_key => $purpose) {
+				$bench_sql2 = $db->prepare("insert into $schemas.bench_purpose_priority (from_date,to_date,from_time,to_time,court_no,purpose,priority,deal_cd,entry_date,bench_nature,bench_no) values
+				(?,?,?,?,?,?,?,?,?,?,?)");
+				$bench_sql2->execute(array(
+					$listing_date, $listing_date, $from_time, $from_time,
+					$court_no, $purpose['purpose_code'], $purpose['purpose_priority'], $sessionUserType, $entry_date, $bench_nature, $max_bench
+				));
+			}
+		}
+		return $max_bench;
+	}
+
+	function save_allocation($db, $schemas, $filing_no, $listing_date, $purpose, $court_no, $bench_nature, $get_bench_no, $next_list_purpose, $next_listing_date, $action_type, $current_status, $sessionUserType, $entry_date, $location_id)
+	{
+		$connected = 'N';
+		$is_listed = 1;
+		$priority_serial1 = 999;
+		$list_flag = 1;
+
+		$is_case_exists = $db->prepare("select count(*) as count from $schemas.case_allocation where filing_no = ? and listing_date = ?");
+		$is_case_exists->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$is_case_exists->bindParam(2, $listing_date, PDO::PARAM_STR);
+		$is_case_exists->execute();
+		$is_case_exists = $is_case_exists->fetchColumn();
+		if ($is_case_exists == 0) {
+
+			$insert = $db->prepare("insert into $schemas.case_allocation(filing_no,listing_date,purpose,entry_date,deal_cd,connected,priority_serial,bench_nature,bench_no,
+			 court_no,list_flag,listed,next_list_date) values(?,?,?,?,?,?,?,?,?,?,?,?,?)");
+			$insert->bindParam(1, $filing_no, PDO::PARAM_STR);
+			$insert->bindParam(2, $listing_date, PDO::PARAM_STR);
+			$insert->bindParam(3, $purpose, PDO::PARAM_STR);
+			$insert->bindParam(4, $entry_date, PDO::PARAM_STR);
+			$insert->bindParam(5, $sessionUserType, PDO::PARAM_STR);
+			$insert->bindParam(6, $connected, PDO::PARAM_STR);
+			$insert->bindParam(7, $priority_serial1, PDO::PARAM_STR);
+			$insert->bindParam(8, $bench_nature, PDO::PARAM_STR);
+			$insert->bindParam(9, $get_bench_no, PDO::PARAM_STR);
+			$insert->bindParam(10, $court_no, PDO::PARAM_STR);
+			$insert->bindParam(11, $list_flag, PDO::PARAM_STR);
+			$insert->bindParam(12, $is_listed, PDO::PARAM_STR);
+			$insert->bindParam(13, $next_listing_date, PDO::PARAM_STR);
+			$res = $insert->execute();
+		} else {
+			$update = $db->prepare("update $schemas.case_allocation set purpose = ?,entry_date = ?,deal_cd = ?,connected = ?,priority_serial = ?,bench_nature = ?,bench_no = ?,
+			 court_no = ?,list_flag = ?,listed = ?,location_code = ?,next_list_date = ? where filing_no = ? and listing_date = ?");
+			$update->bindParam(1, $purpose, PDO::PARAM_STR);
+			$update->bindParam(2, $entry_date, PDO::PARAM_STR);
+			$update->bindParam(3, $sessionUserType, PDO::PARAM_STR);
+			$update->bindParam(4, $connected, PDO::PARAM_STR);
+			$update->bindParam(5, $priority_serial1, PDO::PARAM_STR);
+			$update->bindParam(6, $bench_nature, PDO::PARAM_STR);
+			$update->bindParam(7, $get_bench_no, PDO::PARAM_STR);
+			$update->bindParam(8, $court_no, PDO::PARAM_STR);
+			$update->bindParam(9, $list_flag, PDO::PARAM_STR);
+			$update->bindParam(10, $is_listed, PDO::PARAM_STR);
+			$update->bindParam(11, $location_id, PDO::PARAM_STR);
+			$update->bindParam(12, $next_listing_date, PDO::PARAM_STR);
+			$update->bindParam(13, $filing_no, PDO::PARAM_STR);
+			$update->bindParam(14, $listing_date, PDO::PARAM_STR);
+			$res = $update->execute();
+		}
+		return $res;
+	}
+
+	function save_proceeding($db, $schemas, $filing_no, $listing_date, $purpose, $court_no, $bench_nature, $get_bench_no, $next_list_purpose, $next_listing_date, $action_type, $status, $sessionUserType, $entry_date, $location_id, $next_court_no)
+	{
+		$ins_proceeding = $db->prepare("insert into $schemas.case_proceeding
+					(filing_no,listing_date,purpose,court_no,bench_nature,bench_no,
+					next_list_purpose,
+					next_list_date,todays_action,todays_status,entry_date,user_id,next_court_no)
+					VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+
+		$ins_proceeding->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$ins_proceeding->bindParam(2, $listing_date, PDO::PARAM_STR);
+		$ins_proceeding->bindParam(3, $purpose, PDO::PARAM_STR);
+		$ins_proceeding->bindParam(4, $court_no, PDO::PARAM_STR);
+		$ins_proceeding->bindParam(5, $bench_nature, PDO::PARAM_STR);
+		$ins_proceeding->bindParam(6, $get_bench_no, PDO::PARAM_STR);
+		$ins_proceeding->bindParam(7, $next_list_purpose, PDO::PARAM_STR);
+		$ins_proceeding->bindParam(8, $next_listing_date, PDO::PARAM_STR);
+		$ins_proceeding->bindParam(9, $action_type, PDO::PARAM_STR);
+		$ins_proceeding->bindParam(10, $status, PDO::PARAM_STR);
+		$ins_proceeding->bindParam(11, $entry_date, PDO::PARAM_STR);
+		$ins_proceeding->bindParam(12, $sessionUserType, PDO::PARAM_STR);
+		$ins_proceeding->bindParam(13, $next_court_no, PDO::PARAM_STR);
+		$res = $ins_proceeding->execute();
+		return $res;
+	}
+
+	function save_order($db, $schemas, $filing_no, $listing_date, $sessionUserType, $flag, $get_bench_no, $bench_nature, $court_no, $order_type, $order_pdfpath, $order_filename, $entry_date, $location_id, $order_upload_date, $coram, $case_type, $case_no, $case_year, $judge_code = null, $pet_name, $res_name, $username, $ip, $order_text)
+	{
+		// echo ""
+		$ins_order = $db->prepare("insert into $schemas.order_daily(filing_no,order_date,
+user_id,flag,bench_nature,court_no,entry_date,bench_no,order_type,pdf_path,filename,order_upload_date,judge_codes,case_type,case_no,case_year,judge_code,pet_name,res_name,order_html,entry_user_name,upload_machine_ip)
+values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+
+		$ins_order->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$ins_order->bindParam(2, $listing_date, PDO::PARAM_STR);
+		$ins_order->bindParam(3, $sessionUserType, PDO::PARAM_STR);
+		$ins_order->bindParam(4, $flag, PDO::PARAM_STR);
+		$ins_order->bindParam(5, $bench_nature, PDO::PARAM_STR);
+		$ins_order->bindParam(6, $court_no, PDO::PARAM_STR);
+		$ins_order->bindParam(7, $entry_date, PDO::PARAM_STR);
+		$ins_order->bindParam(8, $get_bench_no, PDO::PARAM_STR);
+		$ins_order->bindParam(9, $order_type, PDO::PARAM_STR);
+		$ins_order->bindParam(10, $order_pdfpath, PDO::PARAM_STR);
+		$ins_order->bindParam(11, $order_filename, PDO::PARAM_STR);
+		$ins_order->bindParam(12, $order_upload_date, PDO::PARAM_STR);
+		$ins_order->bindParam(13, $coram, PDO::PARAM_STR);
+		$ins_order->bindParam(14, $case_type, PDO::PARAM_STR);
+		$ins_order->bindParam(15, $case_no, PDO::PARAM_STR);
+		$ins_order->bindParam(16, $case_year, PDO::PARAM_STR);
+		$ins_order->bindParam(17, $judge_code, PDO::PARAM_STR);
+		$ins_order->bindParam(18, $pet_name, PDO::PARAM_STR);
+		$ins_order->bindParam(19, $res_name, PDO::PARAM_STR);
+		$ins_order->bindParam(20, $order_text, PDO::PARAM_STR);
+		$ins_order->bindParam(21, $username, PDO::PARAM_STR);
+		$ins_order->bindParam(22, $ip, PDO::PARAM_STR);
+		$res = $ins_order->execute();
+		return $res;
+	}
+
+	function save_disposal($db, $schemas, $filing_no, $disposed_date, $disposed_nature, $bench_nature, $get_bench_no, $court_no, $case_no, $case_type, $case_year, $judge_code, $entry_date, $sessionUserType)
+	{
+		$st = "insert into $schemas.case_disposal
+			(filing_no,disposal_date,disposal_nature,court_no,bench_nature,bench_no,case_type,case_no,case_year,judge_code,entry_date,user_id)
+			VALUES
+			(?,?,?,?,?,?,?,?,?,?,?,?)";
+		$st = $db->prepare($st);
+		$st->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$st->bindParam(2, $disposed_date, PDO::PARAM_STR);
+		$st->bindParam(3, $disposed_nature, PDO::PARAM_STR);
+		$st->bindParam(4, $court_no, PDO::PARAM_INT);
+		$st->bindParam(5, $bench_nature, PDO::PARAM_INT);
+		$st->bindParam(6, $get_bench_no, PDO::PARAM_INT);
+		$st->bindParam(7, $case_type, PDO::PARAM_STR);
+		$st->bindParam(8, $case_no, PDO::PARAM_STR);
+		$st->bindParam(9, $case_year, PDO::PARAM_STR);
+		$st->bindParam(10, $judge_code, PDO::PARAM_INT);
+		$st->bindParam(11, $entry_date, PDO::PARAM_STR);
+		$st->bindParam(12, $sessionUserType, PDO::PARAM_INT);
+		$res = $st->execute();
+		return $res;
+	}
+
+	function save_judgement($db, $schemas, $filing_no, $order_date, $judgement_file_path, $judgement_file_name, $sessionUserType, $entry_date, $case_type, $case_no, $case_year, $judge_code, $pet_name, $res_name, $coram, $judgement_type, $judgement_upload_date)
+	{
+		$judge_name = $db->prepare("select judge_name from $schemas.master_judge where judge_code = ?");
+		$judge_name->bindParam(1, $judge_code, PDO::PARAM_STR);
+		$judge_name->execute();
+		$judge_name = $judge_name->fetchColumn();
+		$display = 't';
+		$order_type = $judgement_type;
+		$status = 'D';
+		//$final_path = $judgement_file_path."/".$judgement_file_name;
+		$st = "insert into $schemas.order_detail
+			(filing_no,case_type,case_no,case_year,pet_name,res_name,path,date_of_order,judge_code,entry_date,user_id,status,order_type,judge_name,display,judge_codes,upload_date)
+			VALUES
+			(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+		$st = $db->prepare($st);
+		$st->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$st->bindParam(2, $case_type, PDO::PARAM_STR);
+		$st->bindParam(3, $case_no, PDO::PARAM_STR);
+		$st->bindParam(4, $case_year, PDO::PARAM_INT);
+		$st->bindParam(5, $pet_name, PDO::PARAM_INT);
+		$st->bindParam(6, $res_name, PDO::PARAM_INT);
+		$st->bindParam(7, $judgement_file_path, PDO::PARAM_STR);
+		$st->bindParam(8, $order_date, PDO::PARAM_STR);
+		$st->bindParam(9, $judge_code, PDO::PARAM_STR);
+		$st->bindParam(10, $entry_date, PDO::PARAM_INT);
+		$st->bindParam(11, $sessionUserType, PDO::PARAM_STR);
+		$st->bindParam(12, $status, PDO::PARAM_INT);
+		$st->bindParam(13, $order_type, PDO::PARAM_INT);
+		$st->bindParam(14, $judge_name, PDO::PARAM_INT);
+		$st->bindParam(15, $display, PDO::PARAM_INT);
+		$st->bindParam(16, $coram, PDO::PARAM_STR);
+		$st->bindParam(17, $judgement_upload_date, PDO::PARAM_STR);
+		$res = $st->execute();
+		return $res;
+	}
+
+	function save_allocation_temp($db, $schemas, $filing_no, $listing_date, $purpose, $court_no, $bench_nature, $get_bench_no, $next_listing_purpose_final, $next_listing_date_final, $action_type, $current_status, $sessionUserType, $entry_date, $location_id)
+	{
+		$connected = 'N';
+		$is_listed = 1;
+		$priority_serial1 = 999;
+		$list_flag = 1;
+
+
+		$insert = $db->prepare("insert into $schemas.case_allocation_temp(filing_no,listing_date,purpose,entry_date,deal_cd,connected,priority_serial,bench_nature,bench_no,
+			 court_no,list_flag,listed,next_list_date,last_purpose) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+		$insert->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$insert->bindParam(2, $listing_date, PDO::PARAM_STR);
+		$insert->bindParam(3, $next_listing_purpose_final, PDO::PARAM_STR);
+		$insert->bindParam(4, $entry_date, PDO::PARAM_STR);
+		$insert->bindParam(5, $sessionUserType, PDO::PARAM_STR);
+		$insert->bindParam(6, $connected, PDO::PARAM_STR);
+		$insert->bindParam(7, $priority_serial1, PDO::PARAM_STR);
+		$insert->bindParam(8, $bench_nature, PDO::PARAM_STR);
+		$insert->bindParam(9, $get_bench_no, PDO::PARAM_STR);
+		$insert->bindParam(10, $court_no, PDO::PARAM_STR);
+		$insert->bindParam(11, $list_flag, PDO::PARAM_STR);
+		$insert->bindParam(12, $is_listed, PDO::PARAM_STR);
+		$insert->bindParam(13, $next_listing_date_final, PDO::PARAM_STR);
+		$insert->bindParam(14, $purpose, PDO::PARAM_STR);
+		$res = $insert->execute();
+		return $res;
+	}
+
+	function update_allocation_temp($db, $schema, $filing_no, $listing_date, $purpose, $court_no, $bench_nature, $get_bench_no, $next_listing_purpose_final, $next_listing_date_final, $action_type, $current_status, $sessionUserType, $entry_date, $location_id)
+	{
+		$cpy = "insert into $schema.case_allocation_his_temp (select * from $schema.case_allocation_temp where filing_no=?)";
+		$cpy = $db->prepare($cpy);
+		$cpy->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$cpy->execute();
+
+		$listed = '0';
+		$criteria = '';
+		$st = "update $schema.case_allocation_temp set purpose=?,deal_cd=?, entry_date=?,  list_criteria=?
+		 ,next_list_date=?,listed=?,listing_date=?,court_no=? where filing_no=?";
+
+		$st = $db->prepare($st);
+		$st->bindParam(1, $next_listing_purpose_final, PDO::PARAM_STR);
+		$st->bindParam(2, $sessionUserType, PDO::PARAM_INT);
+		$st->bindParam(3, $entry_date, PDO::PARAM_STR);
+		$st->bindParam(4, $criteria, PDO::PARAM_STR);
+		$st->bindParam(5, $next_listing_date_final, PDO::PARAM_STR);
+		$st->bindParam(6, $listed, PDO::PARAM_STR);
+		$st->bindParam(7, $listing_date, PDO::PARAM_STR);
+		$st->bindParam(8, $court_no, PDO::PARAM_STR);
+		$st->bindParam(9, $filing_no, PDO::PARAM_STR);
+		$res = $st->execute();
+		return $res;
+	}
+
+	function get_case_info($db, $schema, $filing_no)
+	{
+		$query = "select case_no,case_year,case_type,pet_name,res_name,status from $schema.case_detail where filing_no = ?";
+		$case_info = $db->prepare($query);
+		$case_info->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$case_info->execute();
+		$case_info = $case_info->fetchAll();
+		return $case_info;
+	}
+
+	function update_case_status($db, $schema, $filing_no, $status, $legal_aid)
+	{
+		$update = $db->prepare("update $schema.case_detail set status = ?, legal_aid=? where filing_no = ?");
+		$update->bindParam(1, $status, PDO::PARAM_STR);
+		$update->bindParam(2, $legal_aid, PDO::PARAM_STR);
+		$update->bindParam(3, $filing_no, PDO::PARAM_STR);
+		$res = $update->execute();
+		return $res;
+	}
+
+	function check_is_case_listed_once($db, $schema, $filing_no)
+	{
+		$query = "select count(*) as count from $schema.case_allocation_temp where filing_no = ?";
+		$case_info = $db->prepare($query);
+		$case_info->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$case_info->execute();
+		$case_info = $case_info->fetchColumn();
+		return $case_info;
+	}
+
+	function get_next_list_date_from_allcation_temp($db, $schema, $filing_no)
+	{
+		$query = "select next_list_date from $schema.case_allocation_temp where filing_no = ?";
+		$case_info = $db->prepare($query);
+		$case_info->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$case_info->execute();
+		$case_info = $case_info->fetchColumn();
+		return $case_info;
+	}
+
+	function get_court($db, $schemas)
+	{
+		$courts = $db->prepare("select * from $schemas.court order by court_no");
+		$courts->execute();
+		$courts = $courts->fetchAll();
+		return $courts;
+	}
+	function isValidPDF($fileName, $type, $size)
+	{
+		$mime = mime_content_type($type);
+		// Define allowed MIME types
+		$allowedMimeTypes = [
+			'application/pdf'
+		];
+		// Check if the file's MIME type is allowed
+		if (!in_array($mime, $allowedMimeTypes)) {
+			echo "Invalid file type.";
+			return false;
+		} else {
+			// Check file size
+			$maxFileSize = 10 * 1024 * 1024; // 5MB in bytes
+
+			if ($size > $maxFileSize) {
+				echo "File size exceeds the maximum allowed size (10MB).";
+				return false;
+
+			} else {
+				// Check file name for multiple dots
+				if (strpos($fileName, '.') !== strrpos($fileName, '.')) {
+					echo "File name contains more than one dot.";
+					return false;
+
+				} else {
+					// Check file extension
+					$fileExtension = pathinfo($fileName, PATHINFO_EXTENSION);
+					$allowedExtensions = ['pdf'];
+					if (!in_array(strtolower($fileExtension), $allowedExtensions)) {
+						echo "Invalid file extension.";
+						return false;
+
+					} else {
+						return true;
+					}
+				}
+			}
+		}
+	}
+	function  check_int($userInput)
+	{
+		if (filter_var($userInput, FILTER_VALIDATE_INT) !== false) {
+			// The input is a valid integer
+			$number = intval($userInput);
+			return $number;
+		} else {
+			// Invalid integer input
+			echo "Invalid number.";
+		}
+	}
+
+
+	$data = $_POST;
+	$type = (isset($data['type']) && $data['type'] != '') ? $data['type'] : '';
+	$location_id = $_SESSION['location'];
+	$user_id = htmlspecialchars($_SESSION['id']);
+	if ($type != '') {
+		if ($type == 'search_case') {
+			$case_no = check_int($data['case_no']);
+			$case_year =  check_int($data['case_year']);
+			$case_type = check_int($data['case_type']);
+			$case_detail = get_case_detail($db, $schema, $case_no, $case_year, $case_type, $location_id);
+			if (empty($case_detail)) {
+				$response = array('status' => 0, 'message' => 'Case Not Found');
+				echo json_encode($response);
+				die;
+			}
+			if (!empty($case_detail) && count($case_detail) > 1) {
+				$response = array('status' => 0, 'message' => 'Something went wrong');
+				echo json_encode($response);
+				die;
+			}
+			if (!empty($case_detail) && count($case_detail) == 1) {
+				$case_detail = array_shift($case_detail);
+				/* if($case_detail['status'] == 'D'){
+					$response = array( 'status' => 0, 'message' => 'Case is disposed');
+					echo json_encode($response); die;
+				}else{ */
+				$filing_no = $case_detail['filing_no'];
+				$fn = "'" . $filing_no . "'";
+				$case_no = $case_detail['case_no'];
+				$case_year = $case_detail['case_year'];
+				$case_type = $case_detail['case_type'];
+				$listing_dates = last_proceeding_info($db, $schema, $filing_no);
+				//echo "<pre>"; print_r($listing_dates); die;
+				if (!empty($listing_dates)) {
+					$listing_dates = array_shift($listing_dates);
+					$last_listing_date = $listing_dates['listing_date'];
+					$show_last_listing_date = display_date($last_listing_date);
+					$next_listing_date = $listing_dates['next_list_date'];
+					if ($next_listing_date == '1111-11-11') {
+						$show_next_listing_date = '';
+					} else {
+						$show_next_listing_date = display_date($next_listing_date);
+					}
+					$listing_status = $listing_dates['todays_status'];
+					if ($listing_status == 'X') {
+						$next_list_date_from_alloc = get_next_list_date_from_allcation_temp($db, $schema, $filing_no);
+						if ($next_list_date_from_alloc == '' || $next_list_date_from_alloc == $last_listing_date) {
+							$next_listing_date = '';
+						} else {
+							$next_listing_date = $next_list_date_from_alloc;
+							$show_next_listing_date = display_date($next_listing_date);
+						}
+					}
+				} else {
+					$show_last_listing_date = $show_next_listing_date = '';
+				}
+?>
+				<input type="hidden" value="<?php echo $filing_no; ?>" id="filing_no" name="filing_no">
+				<input type="hidden" value="<?php echo $case_detail['regis_date']; ?>" id="regis_date" name="regis_date">
+				<input type="hidden" value="<?php echo $case_detail['main_case_ia_no']; ?>" id="main_case_filing_no" name="main_case_filing_no">
+				<table id="title" class="table table-hover table-bordered">
+					<thead>
+						<th>Diary No</th>
+						<th>Case No</th>
+						<th>Title</th>
+						<th>Date Of Filing</th>
+						<th>Status</th>
+						<th>Last Listing date</th>
+						<th>Listing date</th>
+						<th>Is This Your Case</th>
+						<!--<th>Action</th>-->
+					</thead>
+					<tbody>
+						<tr>
+							<td><?php echo $filing_no; ?></td>
+							<td><?php echo get_short_name($db, 'case_type', 'short_name', 'id', $case_type) . '/' . $case_no . '(' . get_short_name($db, "$schema.bench_location", 'short_name', 'city_id', $location_id) . ")/" . $case_year; ?></td>
+							<td><?php echo $case_detail['pet_name'] . "  VS  " . $case_detail['res_name']; ?></td>
+							<td><?php echo display_date($case_detail['dt_of_filing']); ?></td>
+							<td><?php echo ($case_detail['status'] == 'D') ? 'Disposed' : (($case_detail['status'] == 'X') ? 'Partial Disposed' : 'Pending'); ?></td>
+							<td><?php echo $show_last_listing_date; ?></td>
+							<td><?php echo $show_next_listing_date; ?></td>
+							<td><input type="checkbox" name="is_case" id="is_case" onClick="get_basic_info(this);" style="background-color:#ccc;" /></td>
+							<!--<td><button type="button" class="btn btn-success" name="dispose_case" id="dispose_case" onClick="return dispose_case('<?php echo $filing_no; ?>');" >Dispose Case If listed with main case</button></td>-->
+						</tr>
+					</tbody>
+				</table>
+			<?php
+				//}
+			}
+		}
+
+
+		if ($type == 'proceeding') {
+			$filing_no = $data['filing_no'];
+			$case_no = $data['case_no'];
+			$case_type = $data['case_type'];
+			$case_year = $data['case_year'];
+			$case_type_array = array(2, 3, 5, 6, 7);
+			$main_case_filing_no = (isset($data['main_case_filing_no']) && in_array($case_type, $case_type_array)) ? $data['main_case_filing_no'] : '';
+			?>
+			<div style="display:none;" id="judge_clone">
+				<div class="form-group">
+					<label class="control-label col-sm-3" for="email">Judge :</label>
+					<div class="col-sm-9">
+						<select class="form-control" id="coram_judge" name="coram_judge[] ">
+							<option value="">Select Judge</option>
+							<?php
+							$bench_nature = bench_judges($db, $schema);
+							foreach ($bench_nature as $key => $value) { ?>
+								<option value="<?php echo $value['judge_code']; ?>"><?php echo $value['judge_name'] ?></option>
+							<?php }
+							?>
+						</select>
+					</div>
+				</div>
+			</div>
+			<div style="display:none;" id="registar_clone">
+				<div class="form-group">
+					<label class="control-label col-sm-3" for="email">Judge :</label>
+					<div class="col-sm-9">
+						<select class="form-control" id="coram_judge" name="coram_judge[] ">
+							<?php
+							$bench_nature = bench_judges($db, $schema, 3);
+							foreach ($bench_nature as $key => $value) { ?>
+								<option value="<?php echo $value['judge_code']; ?>"><?php echo $value['judge_name'] ?></option>
+							<?php }
+							?>
+						</select>
+					</div>
+				</div>
+			</div>
+
+			<form action="proceeding_ajax.php" method="POST" id="submit_proceeding">
+				<input type="hidden" value='<?php echo $filing_no; ?>' id="listing_filing_no" name="listing_filing_no">
+				<input type="hidden" value='save_data' id="type" name="type">
+				<div class="panel panel-default" id="proceeding1">
+					<div class="panel-body">
+						<div class="row" id="benches"></div>
+						<div class="row">
+							<div class="col-sm-4">
+								<div class="form-group">
+									<label class="control-label col-sm-3" for="email">Listing date:</label>
+									<div class="col-sm-9">
+										<input type="text" class="form-control datepicker" id="listing_date" placeholder="Enter Listing Date" name="listing_date" onchange="return getbench(this.id,'benches');" required>
+									</div>
+								</div>
+							</div>
+							<div class="col-sm-4">
+								<div class="form-group">
+									<label class="control-label col-sm-3" for="email">Action Type:</label>
+									<div class="col-sm-9">
+										<select class="form-control" id="action_type" name="action_type" required>
+											<option value="1000">NA</option>
+											<?php
+											$status = 'P';
+											$action_type = $db->prepare("select * from $schema.master_action where status=?");
+											$action_type->bindParam(1, $status, PDO::PARAM_INT);
+											$action_type->execute();
+											$action_type = $action_type->fetchAll();
+											foreach ($action_type as $key => $value) { ?>
+												<option value="<?php echo $value['action_code']; ?>"><?php echo $value['action_type'] ?></option>
+											<?php }
+											?>
+										</select>
+									</div>
+								</div>
+							</div>
+							<div class="col-sm-4">
+								<div class="form-group">
+									<label class="control-label col-sm-3" for="email">Purpose:</label>
+									<div class="col-sm-9">
+										<select class="form-control" id="purpose" name="purpose" required>
+											<option value="1000">NA</option>
+											<?php
+											$display = 'TRUE';
+											$purpose = $db->prepare("select purpose_code,purpose_name from $schema.master_purpose where display = ? ");
+											$purpose->bindParam(1, $display, PDO::PARAM_INT);
+											$purpose->execute();
+											$purpose = $purpose->fetchAll();
+											foreach ($purpose as $key => $value) { ?>
+												<option value="<?php echo $value['purpose_code']; ?>"><?php echo $value['purpose_name'] ?></option>
+											<?php }
+											?>
+										</select>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="row">
+
+							<div class="col-sm-4">
+								<div class="form-group">
+									<label class="control-label col-sm-3" for="email">Court No:</label>
+									<div class="col-sm-9">
+										<select name='court_no' id='court_no' class='form-control' required>
+											<option value=''>Select Court</option>
+											<?php
+											$courts = get_court($db, $schema);
+											foreach ($courts as $k => $court) {
+												echo "<option value='$court[court_no]'>$court[display_court_text]</option>";
+											}
+											?>
+										</select>
+									</div>
+								</div>
+							</div>
+							<div class="col-sm-4 col-lg-4">
+								<div class="form-group">
+									<label class="control-label col-sm-4" for="email">Upload Order/Judgement</label>
+									<div class="col-sm-8 col-lg-8">
+										<input type="file" class="form-control" name="upload_order" id="upload_order">
+									</div>
+								</div>
+							</div>
+							<div class="col-sm-4 col-lg-4">
+								<div class="form-group">
+									<label class="control-label col-sm-4" for="email">Order/Judgement Upload Date : </label>
+									<div class="col-sm-8 col-lg-8">
+										<input type="text" class="form-control datepicker" id="upload_date" placeholder="Order upload Date" name="upload_date">
+									</div>
+								</div>
+							</div>
+							<!--<div class="col-sm-4 col-lg-4">
+								<div class="form-group">
+								  <label class="control-label col-sm-3" for="email">Order Type:</label>
+								  <div class="col-sm-9 col-lg-9">
+									<select id="order_type" name="order_type" class="form-control" style="width:257px;">
+										.<option value='S'>Short Order</option>
+										.<option value='D'>Detailed Order</option>
+									</select>
+								  </div>
+								</div>
+							</div>-->
+						</div>
+
+						<div class="row">
+
+							<div class="col-sm-4 col-lg-4">
+								<!--<div class="form-group">
+								  <label class="control-label col-sm-3" for="email">Bench Nature:</label>
+								  <div class="col-sm-9 col-lg-9">
+									<select class="form-control" id="bench_nature" name="bench_nature" onChange="return set_coram(this,this.id);" required>
+									<option data-number_of_judges_in_bench = "" value="">-- Select Bench --</option>
+									<?php
+									$display = 'TRUE';
+									$bench_nature = $db->prepare("select * from $schema.bench_nature where display = ? order by bench_code");
+									$bench_nature->bindParam(1, $display, PDO::PARAM_INT);
+									$bench_nature->execute();
+									$bench_nature = $bench_nature->fetchAll();
+									foreach ($bench_nature as $key => $value) { ?>
+											<option data-number_of_judges_in_bench = '<?php echo $value['no_of_judges']; ?>' value="<?php echo $value['bench_code']; ?>"><?php echo $value['bench_name'] ?></option>
+										<?php }
+										?>
+									</select>
+								  </div>
+								</div>-->
+								<div class="col-sm-6">
+									Do you want to enter custom coram : <input type="checkbox" name="custom_coram" id="custom_coram" onClick="set_custom_coram(this);" style="background-color:#ccc;" /></td>
+								</div>
+								<div class="col-sm-9" id="enter_coram_count">
+
+								</div>
+							</div>
+
+						</div>
+						<div class="row" id="coram">
+
+
+						</div>
+						<!--<div class="row">
+							<div class="col-sm-12 col-lg-12">
+								<div class="form-group">
+								  <label class="control-label col-sm-10" for="email">Was the order available on the old site and uploaded into new site/Or want to enter upload date:</label>
+								  <div class="col-sm-2 col-lg-2">
+									<label class="radio-inline"><input type="radio" name="order_old_site" value="1" onchange = "return radio_event(1);">Yes</label>
+									<label class="radio-inline"><input type="radio" name="order_old_site" value="0" onchange = "return radio_event(0);"> No</label>
+								  </div>
+								</div>
+							</div>	
+						</div>-->
+						<!--<div class="row hide"  id="order_upload_date">
+							<div class="col-sm-12 col-lg-12">
+								<div class="form-group">
+								  <label class="control-label col-sm-6" for="email">Order Upload Date : </label>
+								  <div class="col-sm-6 col-lg-6">
+									<input type="text" class="form-control datepicker" id="upload_date" placeholder="Order upload Date" name="upload_date">
+								  </div>
+								</div>
+							</div>	
+						</div>-->
+
+						<div class="row">
+							<div class="col-sm-4">
+								<div class="form-group">
+									<label class="control-label col-sm-3" for="email">Status:</label>
+									<div class="col-sm-9">
+										<label class='radio-inline'><input type='radio' name='case_status' value="P" onChange='return get_form_by_status("P")' required>Pending</label><label class='radio-inline'><input type='radio' name='case_status' value="D" onChange='return get_form_by_status("D")' required>Disposed</label>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="row hide" id="disposed_form">
+							<div class="row">
+								<div class="col-sm-4 col-lg-4">
+									<div class="form-group" id="disposal_date_show_hide">
+										<label class="control-label col-sm-3" for="email">Disposed date:</label>
+										<div class="col-sm-9">
+											<input type="text" class="form-control datepicker" id="disposed_date" placeholder="Enter Disposed Date" name="disposed_date">
+										</div>
+									</div>
+									<div class="form-group" id="partial_disposal_date_show_hide" style="display:none;">
+										<label class="control-label col-sm-3" for="email">Partial Disposed Time:</label>
+										<div class="col-sm-9">
+											<input type="number" class="form-control" name="parial_disposed_weeks" id="parial_disposed_weeks"><span>Weeks<input type="number" class="form-control" name="parial_disposed_months" id="parial_disposed_months">Months</span>
+										</div>
+									</div>
+								</div>
+								<div class="col-sm-4 col-lg-4">
+									<div class="form-group">
+										<label class="control-label col-sm-3" for="email">Disposed Nature:</label>
+										<div class="col-sm-9">
+											<select class="form-control" id="disposed_nature" name="disposed_nature" onChange="return set_partial_disposal(this.value);">
+												<?php
+												$status = 'D';
+												$action_type = $db->prepare("select * from $schema.master_action where status=?");
+												$action_type->bindParam(1, $status, PDO::PARAM_INT);
+												$action_type->execute();
+												$action_type = $action_type->fetchAll();
+												foreach ($action_type as $key => $value) { ?>
+													<option value="<?php echo $value['action_code']; ?>"><?php echo $value['action_type'] ?></option>
+												<?php }
+												?>
+											</select>
+										</div>
+									</div>
+								</div>
+								<!--<div class="col-sm-4 col-lg-4">
+								<div class="form-group">
+								  <label class="control-label col-sm-3" for="email" required>Judge:</label>
+								  <div class="col-sm-9 col-lg-9">
+								  <?php $master_judges = get_master_judges($db, $schema); ?>
+									<select class="form-control" name="presiding_judge" id="presiding_judge">
+									<option value=''>Select</option>
+										<?php foreach ($master_judges as $k => $v) {
+											echo "<option value='$v[judge_code]'>$v[judge_name]</option>";
+										}
+										?>
+									</select>
+								  </div>
+								</div>
+							</div>-->
+
+								<!--<div class="col-sm-4 col-lg-4">
+								<div class="form-group">
+								  <label class="control-label col-sm-3" for="email" required>Upload Order:</label>
+								  <div class="col-sm-9 col-lg-9">
+									<input type="file" class="form-control" name="upload_judgement" id="upload_judgement">
+								  </div>
+								</div>
+							</div>-->
+							</div>
+							<div class="row">
+								<!--<div class="col-sm-4 col-lg-4">
+								<div class="form-group">
+								  <label class="control-label col-sm-3" for="email">Judgement Type:</label>
+								  <div class="col-sm-9 col-lg-9">
+									<select id="judgement_type" name="judgement_type" class="form-control" style="width:257px;">
+										.<option value='I'>Short Judgement</option>
+										.<option value='F'>Detailed Judgement</option>
+									</select>
+								  </div>
+								</div>
+							</div>-->
+
+
+								<!--<div class="col-sm-4 col-lg-4">
+								<div class="form-group">
+								  <label class="control-label col-sm-3" for="email">Upload Date(optional):</label>
+								  <div class="col-sm-9 col-lg-9">
+									<input type="text" class="form-control datepicker" id="judgement_upload_date" placeholder="Enter Upload Date" name="judgement_upload_date">
+								  </div>
+								</div>
+							</div>-->
+
+
+								<!--<div class="col-sm-4 col-lg-4">
+								<div class="form-group">
+								  <label class="control-label col-sm-3" for="email" required>Judge:</label>
+								  <div class="col-sm-9 col-lg-9">
+								  <?php $master_judges = get_master_judges($db, $schema); ?>
+									<select class="form-control" name="presiding_judge" id="presiding_judge">
+										<?php foreach ($master_judges as $k => $v) {
+											echo "<option value='$v[judge_code]'>$v[judge_name]</option>";
+										}
+										?>
+									</select>
+								  </div>
+								</div>
+							</div>-->
+							</div>
+						</div>
+						<div class="row hide" id="pending_form">
+							<div class="col-sm-4 col-lg-4">
+								<div class="form-group">
+									<label class="control-label col-sm-3" for="email">Next Listing Purpose:</label>
+									<div class="col-sm-9">
+										<select class="form-control" id="next_listing_purpose" name="next_listing_purpose">
+											<?php
+											$display = 'TRUE';
+											$purpose = $db->prepare("select purpose_code,purpose_name from $schema.master_purpose where display = ? ");
+											$purpose->bindParam(1, $display, PDO::PARAM_INT);
+											$purpose->execute();
+											$purpose = $purpose->fetchAll();
+											foreach ($purpose as $key => $value) { ?>
+												<option value="<?php echo $value['purpose_code']; ?>"><?php echo $value['purpose_name'] ?></option>
+											<?php }
+											?>
+										</select>
+									</div>
+								</div>
+							</div>
+							<div class="col-sm-4 col-lg-4">
+								<div class="form-group">
+									<label class="control-label col-sm-3" for="email">Next Listing date:</label>
+									<div class="col-sm-9">
+										<input type="text" class="form-control datepicker" id="next_listing_date" placeholder="Enter Next Listing Date" name="next_listing_date">
+									</div>
+								</div>
+							</div>
+							<div class="col-sm-4 col-lg-4">
+								<div class="form-group">
+									<label class="control-label col-sm-3" for="email">Next Listing Court :</label>
+									<div class="col-sm-9">
+										<select name='next_court_no' id='next_court_no' class='form-control'>
+											<?php
+											$courts = get_court($db, $schema);
+											foreach ($courts as $k => $court) {
+												echo "<option value='$court[court_no]'>$court[display_court_text]</option>";
+											}
+											?>
+										</select>
+									</div>
+								</div>
+							</div>
+
+						</div>
+
+
+						<div class="row">
+							<center><button type="submit" id="add_more_button" class="btn btn-sm btn-primary">Save</button></center>
+						</div>
+					</div>
+				</div>
+			</form>
+
+		<?php //}
+		}
+
+
+		if ($type == 'view_inserted_info') {
+			$filing_no = $data['listing_filing_no'];
+			$listing_date = $data['listing_date'];
+			$action_type = $data['action_type'];
+			$purpose = $data['purpose'];
+			$court_no = $data['court_no'];
+			$bench_nature = $data['bench_nature'];
+			$coram_judge = $data['coram_judge'];
+			$coram = implode(',', $coram_judge);
+			$case_status = $data['case_status'];
+			$disposed_date = $data['disposed_date'];
+			$disposed_nature = $data['disposed_nature'];
+			$presiding_judge = $data['presiding_judge'];
+			$next_listing_date = $data['next_listing_date'];
+			$next_listing_purpose = $data['next_listing_purpose'];
+			$order = $_FILES["upload_order"]["name"];
+			$judgement = $_FILES["upload_judgement"]["name"];
+			$display = 'TRUE';
+			$purpose_name = $db->prepare("select purpose_name from $schema.master_purpose where display = ? and purpose_code = ?");
+			$purpose_name->bindParam(1, $display, PDO::PARAM_STR);
+			$purpose_name->bindParam(2, $purpose, PDO::PARAM_INT);
+			$purpose_name->execute();
+			$purpose_name = $purpose_name->fetchColumn();
+
+			$bench_name = $db->prepare("select bench_name from $schema.bench_nature where display = ? and bench_code = ?");
+			$bench_name->bindParam(1, $display, PDO::PARAM_STR);
+			$bench_name->bindParam(2, $bench_nature, PDO::PARAM_INT);
+			$bench_name->execute();
+			$bench_name = $bench_name->fetchColumn();
+		?>
+			<table class="table table-striped">
+				<thead>
+					<tr>
+						<th scope="col">Listing Date</th>
+						<th scope="col">Purpose</th>
+						<th scope="col">Court</th>
+						<th scope="col">Bench</th>
+						<th scope="col">Coram</th>
+						<th scope="col">Order</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr id="<?php echo $value['id']; ?>">
+						<th scope="row"><?php echo $listing_date; ?></th>
+						<td><?php echo $purpose_name; ?></td>
+						<td><?php echo $court_no; ?></td>
+						<td><?php echo $bench_name; ?></td>
+						<td>
+							<?php
+							$coram = $db->prepare("select hon_text,judge_desg_code,judge_code,judge_name from $schema.master_judge where judge_code in ($coram)");
+							$coram->execute();
+							$coram = $coram->fetchAll();
+							foreach ($coram as $k => $v) {
+								echo "$v[hon_text]  $v[judge_name]<br/>";
+							}
+							?>
+
+						</td>
+						<td><a target="_blank" href="#"><?php echo $order; ?></a></td>
+
+					</tr>
+				</tbody>
+			</table>
+			<?php
+			$staus_name = ($case_status == "P") ? "Pending" : "Disposed";
+			$column_name1 = ($case_status == "P") ? "Next Listing Date" : "Disposed Date";
+			$column_name2 = ($case_status == "P") ? "Next Listing Purpose" : "Disposed Nature";
+			$column_name1_value = ($case_status == "P") ? date("d/m/Y", strtotime($next_listing_date)) : date("d/m/Y", strtotime($disposed_date));
+			$column_name2_value = '';
+			if ($case_status == "P") {
+				if ($next_listing_purpose != '') {
+					$next_purpose = $db->prepare("select purpose_name from $schema.master_purpose where purpose_code = ?");
+					$next_purpose->bindParam(1, $next_listing_purpose, PDO::PARAM_STR);
+					$next_purpose->execute();
+					$next_purpose = $next_purpose->fetchColumn();
+					$column_name2_value = $next_purpose;
+				}
+			} else {
+				if ($disposed_nature != '') {
+					$d_nature = $db->prepare("select action_type from $schema.master_action where action_code = ?");
+					$d_nature->bindParam(1, $disposed_nature, PDO::PARAM_STR);
+					$d_nature->execute();
+					$d_nature = $d_nature->fetchColumn();
+					$d_nature = $d_nature;
+					$column_name2_value = $d_nature;
+				}
+			}
+			?>
+			<table class="table table-striped">
+				<thead>
+					<tr>
+						<th scope="col">Status</th>
+						<th scope="col"><?php echo $column_name1; ?></th>
+						<th scope="col"><?php echo $column_name2; ?></th>
+						<?php if ($case_status == 'D') { ?>
+							<th>Judgement</th>
+							<th>Judge</th>
+						<?php } ?>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<th scope="row"><?php echo $staus_name; ?></th>
+						<td><?php echo $column_name1_value; ?></td>
+						<td><?php echo $column_name2_value; ?></td>
+						<?php if ($case_status == "D") { ?>
+							<td><a target="_blank" href="#"><?php echo $judgement; ?></a></td>
+							<td>
+								<?php
+								if (!empty($presiding_judge)) {
+									$display = 'TRUE';
+									$judge_name = $db->prepare("select judge_name from $schema.master_judge where judge_code = ? and display = ?");
+									$judge_name->bindParam(1, $presiding_judge, PDO::PARAM_INT);
+									$judge_name->bindParam(2, $display, PDO::PARAM_INT);
+									$judge_name->execute();
+									$judge_name = $judge_name->fetchColumn();
+									echo  $judge_name;
+								}
+								?>
+							</td>
+						<?php } ?>
+					</tr>
+					<tr>
+						<td colspan="4">
+							<center><button type="button" class="btn btn-sm btn-success" onClick="return submit_final('<?php echo $filing_no; ?>');">Final Submit</button></center>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+<?php }
+
+		if ($type == 'save_data') {
+			try {
+				$db->beginTransaction();  // begin transaction
+				$dbonline->beginTransaction();
+				//parse_str($data['formdata'], $formdata);
+				$filing_no = check_int($data['listing_filing_no']);
+				$listing_date = $data['listing_date'];
+				list($day, $month, $year) = explode('/', $listing_date);
+				$listing_date = $year . "-" . $month . "-" . $day;
+				$purpose = check_int($data['purpose']);
+				$court_no = check_int($data['court_no']);
+				$next_court_no = check_int($data['next_court_no']);
+				$next_court_no = (isset($next_court_no)) ? $next_court_no : '';
+				$no_of_judges_count = (isset($data['number_of_judges'])) ? $data['number_of_judges'] : '';
+				$selected_bench_no = (isset($data['bench_no'])) ? $data['bench_no'] : '';
+				if ($no_of_judges_count != '') {
+					$bench_nature = 7;
+				}
+				$action_type = check_int($data['action_type']);
+				$coram_judges = $data['coram_judge'];
+				$checkd_value = $data['order_old_site'];
+				if ($checkd_value) {
+					$order_upload_date = $data['upload_date'];
+					if ($order_upload_date != '') {
+						list($day, $month, $year) = explode('/', $order_upload_date);
+						$order_upload_date = $year . "-" . $month . "-" . $day;
+					} else {
+						$order_upload_date = '9999-01-01';
+					}
+				} else {
+					$order_upload_date = '9999-01-01';
+				}
+				$presiding_judge_coram = $coram_judges[0];
+				$coram = implode(',', $coram_judges);
+				$disposed_date = $data['disposed_date'];
+				list($day, $month, $year) = explode('/', $disposed_date);
+				$disposed_date = $year . "-" . $month . "-" . $day;
+				$case_status = $data['case_status'];
+				$disposed_nature = check_int($data['disposed_nature']);
+				$presiding_judge = $data['presiding_judge'];
+				$next_listing_date = (!empty($data['next_listing_date'])) ? $data['next_listing_date'] : '1111/11/11';
+				list($day, $month, $year) = explode('/', $next_listing_date);
+				$next_listing_date = $year . "-" . $month . "-" . $day;
+				$next_list_purpose = check_int($data['next_listing_purpose']);
+				$order = $_FILES["upload_order"]["name"];
+				if ($case_status == 'P')
+					$order_type = 'D';
+				else
+					$order_type = 'J';
+				/* $judgement = $_FILES["upload_judgement"]["name"];
+				$judgement_type = $data['judgement_type'];
+				$upload_judgement_date = (isset($_POST['judgement_upload_date']) && $_POST['judgement_upload_date'] != '')?$_POST['judgement_upload_date']:'01/01/9999';
+				list($day,$month,$year)=explode('/',$upload_judgement_date);
+				$judgement_upload_date=$year."-".$month."-".$day; */
+				$server_date = date('d-m-Y'); //Returns IST 
+				if ($server_date != '') {
+					list($day, $month, $year) = explode('-', $server_date);
+					$entry_date = $year . "-" . $month . "-" . $day;
+				}
+				$case_detail = get_case_info($db, $schema, $filing_no);
+				if (!empty($case_detail)) {
+					$case_detail = array_shift($case_detail);
+				}
+				$recent_proceeding_info = last_proceeding_info($db, $schema, $filing_no);
+				$check_if_already_proceeded = check_if_already_proceed($db, $schema, $filing_no, $listing_date, '');
+				if ($check_if_already_proceeded > 0) {
+					$response['status'] = 0;
+					$response['message'] = 'Proceeding already completed for this listing dateddd';
+					echo json_encode($response);
+					die;
+				}
+				if ($listing_date > $entry_date) {
+					$response['status'] = 0;
+					$response['message'] = 'Listing date can not be greater than current date';
+					echo json_encode($response);
+					die;
+				}
+
+				if (!empty($recent_proceeding_info)) {
+					$listing_dates = array_shift($recent_proceeding_info);
+					$saved_last_listing_date = $listing_dates['listing_date'];
+					$saved_next_listing_date = $listing_dates['next_list_date'];
+					/* if(strtotime($saved_next_listing_date) !== strtotime($listing_date) ){
+							$response['status'] = 0; 
+							$response['message'] = 'Listing date should be equal to next listing date mentioned above'; 
+							echo json_encode($response); die;
+						} */
+				}
+				if ($case_status == 'P') {
+					/* if(strtotime($next_listing_date) <= strtotime($listing_date) ){
+							$response['status'] = 0; 
+							$response['message'] = 'Next List date must be greater than previous listing date'; 
+							echo json_encode($response); die;
+					} */
+				}
+				/* if($disposed_nature == '31'){
+					$total_days = 0;
+					$partial_disposal_weeks = (isset($_REQUEST['parial_disposed_weeks']) && $_REQUEST['parial_disposed_weeks'] != '')?$_REQUEST['parial_disposed_weeks']:'0';
+					$partial_disposal_months = (isset($_REQUEST['parial_disposed_months']) && $_REQUEST['parial_disposed_months'] != '')?$_REQUEST['parial_disposed_months']:'0';
+					$total_days += $partial_disposal_months*30;
+					$total_days += $partial_disposal_weeks*7;
+					$disposed_date = date('Y-m-d', strtotime("+".$total_days." days"));
+					$case_status = 'X';
+				} */
+				// can not proceed listing if listing date is greator than disposed date 
+				if ($case_detail['status'] == 'D') {
+					if (strtotime($saved_last_listing_date) <= strtotime($listing_date)) {
+						$response['status'] = 0;
+						$response['message'] = 'Listing date can not be greator than and equal to last listing date in disposed case';
+						echo json_encode($response);
+						die;
+					}
+				}
+				// end here
+				if (!empty($case_detail)) {
+					$case_type = $case_detail['case_type'];
+					$case_year = $case_detail['case_year'];
+					$case_no = $case_detail['case_no'];
+					$pet_name = $case_detail['pet_name'];
+					$res_name = $case_detail['res_name'];
+				}
+				$order_type_title = 'daily';
+				/* $uploadDir = '../casedoc/orders/'.$location_name.'/'.$listing_date.'/courts/'.$court_no.'/'.$order_type_title;
+				$saveUploadDir = '/casedoc/orders/'.$location_name.'/'.$listing_date.'/courts/'.$court_no.'/'.$order_type_title; */
+
+				$uploadDir = '/NCLAT_Documents/CIS_Documents/casedoc/orders/' . $location_name . '/' . $listing_date . '/courts/' . $court_no . '/' . $order_type_title;
+				$saveUploadDir = '/NCLAT_Documents/CIS_Documents/casedoc/orders/' . $location_name . '/' . $listing_date . '/courts/' . $court_no . '/' . $order_type_title;
+
+				/* $uploadDirJudgement = '../casedoc/judgements/'.$location_name.'/'.$disposed_date;
+				$saveUploadDirJudgement = '/casedoc/judgements/'.$location_name.'/'.$disposed_date; */
+
+				$uploadedFile = '';
+				$uploadStatus = 1;
+				if (!empty($_FILES["upload_order"]["name"])) {
+					$uploadedFilePath =	$_FILES['upload_order']['name'];
+					$file_type = $_FILES['upload_order']['tmp_name'];
+					$size = $_FILES['upload_order']['size'];
+					if (isValidPDF($uploadedFilePath, $file_type, $size)) {
+						$status = true;
+					} else {
+						$response['status'] = 0;
+						$response['message'] = 'PDF file is not valid.';
+						echo json_encode($response);
+						die;
+					}
+					if ($status) {
+						$query = $db->prepare("select count(*) as count from $schema.order_daily where filing_no = ? and order_date = ? and order_type = ?");
+						$query->bindParam(1, $filing_no, PDO::PARAM_STR);
+						$query->bindParam(2, $listing_date, PDO::PARAM_STR);
+						$query->bindParam(3, $order_type, PDO::PARAM_STR);
+						$query->execute();
+						$res = $query->fetchColumn();
+					}
+					if ($res > 0) {
+						$response['status'] = 0;
+						$response['message'] = 'Order Already Uploaded';
+						echo json_encode($response);
+						die;
+					}
+					// File path config 
+					$fileName = basename($_FILES["upload_order"]["name"]);
+					$uniquesavename = time() . uniqid(rand()) . '.pdf';
+					$targetFilePath = $uploadDir . '/' . $uniquesavename;
+					$acttual_file = $uploadDir . '/' . $fileName;
+					$saveTargetFilePath = $saveUploadDir . '/' . $uniquesavename;
+					$fileType = pathinfo($acttual_file, PATHINFO_EXTENSION);
+					$allowTypes = array('pdf');
+					if (in_array($fileType, $allowTypes)) {
+						// Upload file to the server 
+						if (!file_exists($uploadDir)) {
+							mkdir($uploadDir, 0777, true);
+						}
+						if (move_uploaded_file($_FILES["upload_order"]["tmp_name"], $targetFilePath)) {
+							$uploadedFile = $fileName;
+						} else {
+							$uploadStatus = 0;
+							$response['status'] = 0;
+							$response['message'] = 'Sorry, there was an error uploading your file.';
+							echo json_encode($response);
+							die;
+						}
+					} else {
+						$uploadStatus = 0;
+						$response['status'] = 0;
+						$response['message'] = 'Sorry, only PDF files are allowed to upload.';
+						echo json_encode($response);
+						die;
+					}
+				} else {
+					$uploadStatus = 0;
+				}
+				/* if(!empty($_FILES["upload_judgement"]["name"])){ 
+				$fileNameJudgement = basename($_FILES["upload_judgement"]["name"]); 
+				$uniquesavename=time().uniqid(rand()).'.pdf';
+				$targetFilePath = $uploadDirJudgement .'/'. $uniquesavename; 
+				$acttual_file = $uploadDirJudgement .'/'. $fileNameJudgement; 
+				$saveTargetFilePathJudgement = $saveUploadDirJudgement.'/'. $uniquesavename; 
+				
+				$fileType = pathinfo($acttual_file, PATHINFO_EXTENSION); 
+				 
+				$allowTypes = array('pdf'); 
+					if(in_array($fileType, $allowTypes)){ 
+						if (!file_exists($uploadDirJudgement)) {
+							mkdir($uploadDirJudgement, 0777, true);
+						}
+						if(move_uploaded_file($_FILES["upload_judgement"]["tmp_name"], $targetFilePath)){ 
+							$uploadedFileJudgement = $fileName; 
+						}else{ 
+							$uploadStatusJudgement = 0; 
+							$response['message'] = 'Sorry, there was an error uploading your file.'; 
+						} 
+					}else{ 
+						$uploadStatusJudgement = 0; 
+						$response['message'] = 'Sorry, only PDF files are allowed to upload.'; 
+					} 
+				}
+				else{
+					$uploadStatusJudgement = 0; 
+				} */
+
+
+				if ($case_status == 'D') {
+					// create bench if not exists by checking listing date, court no and coram
+					if ($no_of_judges_count != '') {
+						$bench_creation = 0;
+						$check_bench = check_if_bench_exist($db, $schema, $court_no, $listing_date, $bench_nature);
+						if (!empty($check_bench)) {
+							$is_match = 0;
+							// check coram
+							foreach ($check_bench as $k => $v) {
+								$bench_no = $v['bench_no'];
+								$get_coram = get_coram($db, $schema, $listing_date, $court_no, $bench_nature, $bench_no);
+								$saved_coram = array_map(function ($element) {
+									return $element['judge_code'];
+								}, $get_coram);
+								$saved_coram = implode(',', $saved_coram);
+								if ($coram == $saved_coram) {
+									$is_match = 1;
+									$matched_bench_no = $bench_no;
+									break;
+								}
+							}
+							if ($is_match == 0) {
+								// create bench
+								$get_bench_no = create_bench($db, $schema, $listing_date, $court_no, $bench_nature, $presiding_judge_coram, $location_id, $limit_case = 90, $sessionUserType, $coram_judges, $entry_date);
+							} else {
+								/* $sql_max="select max(bench_no) from $schema.bench where from_list_date = ? and bench_nature = ? and court_no = ?";
+							$sql_max = $db->prepare($sql_max);
+							$sql_max->bindParam(1, $listing_date, PDO::PARAM_STR);
+							$sql_max->bindParam(2, $bench_nature, PDO::PARAM_STR);
+							$sql_max->bindParam(3, $court_no, PDO::PARAM_STR);
+							$sql_max->execute();
+							$get_bench_no = $sql_max->fetchColumn();  */
+								$get_bench_no = $matched_bench_no;
+							}
+						} else {
+							// create bench
+							$get_bench_no = create_bench($db, $schema, $listing_date, $court_no, $bench_nature, $presiding_judge_coram, $location_id, $limit_case = 90, $sessionUserType, $coram_judges, $entry_date);
+						}
+					} else {
+						if ($selected_bench_no == '') {
+							$response = array(
+								'status' => 0,
+								'message' => 'bench and custom coram both not entered, either select bench or enter coram'
+							);
+							echo json_encode($response);
+							die;
+						} else {
+							$bench_data = "select court_no,bench_no,bench_nature from $schema.bench where from_list_date = ? and bench_no= ?";
+							$bench_data = $db->prepare($bench_data);
+							$bench_data->bindParam(1, $listing_date, PDO::PARAM_STR);
+							$bench_data->bindParam(2, $selected_bench_no, PDO::PARAM_STR);
+							$bench_data->execute();
+							$bench_data = $bench_data->fetchAll();
+							$bench_data = array_shift($bench_data);
+							$bench_nature = $bench_data['bench_nature'];
+							$get_bench_no = $bench_data['bench_no'];
+							$court_no = $bench_data['court_no'];
+
+							$bench_judges = "select string_agg(cast(judge_code as varchar),',') as judge_codes from $schema.bench_judge where from_list_date = ? and bench_no = ?";
+							$bench_judges = $db->prepare($bench_judges);
+							$bench_judges->bindParam(1, $listing_date, PDO::PARAM_STR);
+							$bench_judges->bindParam(2, $selected_bench_no, PDO::PARAM_STR);
+							$bench_judges->execute();
+							$coram = $bench_judges->fetchColumn();
+						}
+					}
+					// create bench end
+
+					// save proceeding and order
+					$current_status = $case_status;
+					//$save_in_allocation = save_allocation($db,$schema,$filing_no,$listing_date,$purpose,$court_no,$bench_nature,$get_bench_no,$purpose,$next_listing_date,$action_type,$current_status,$sessionUserType,$entry_date,$location_id);
+					$ins_proceeding = save_proceeding($db, $schema, $filing_no, $listing_date, $purpose, $court_no, $bench_nature, $get_bench_no, $next_list_purpose, $next_listing_date, $action_type, $current_status, $sessionUserType, $entry_date, $location_id, $next_court_no);
+					if ($uploadStatus == 1) {
+						$order_text = get_order_text($parser, $saveTargetFilePath);
+						$ins_order = save_order($db, $schema, $filing_no, $listing_date, $sessionUserType, $flag = 'Y', $get_bench_no, $bench_nature, $court_no, $order_type, $saveTargetFilePath, $fileName, $entry_date, $location_id, $order_upload_date, $coram, $case_type, $case_no, $case_year, $judge_code = null, $pet_name, $res_name, $username, $ip, $order_text);
+					}
+					// save proceeding and order 
+					$check_is_listed_once = check_is_case_listed_once($db, $schema, $filing_no);
+					if ($case_status == 'D') {
+						$judge_code = $presiding_judge;
+						$next_listing_date_final = '1111-11-11';
+						$next_listing_purpose_final = '0';
+						$save_disposal = save_disposal($db, $schema, $filing_no, $disposed_date, $disposed_nature, $bench_nature, $get_bench_no, $court_no, $case_no, $case_type, $case_year, $judge_code, $entry_date, $sessionUserType);
+						//$save_judgement = save_judgement($db,$schema,$filing_no,$disposed_date,$saveTargetFilePathJudgement,$fileNameJudgement,$sessionUserType,$entry_date,$case_type,$case_no,$case_year,$judge_code,$pet_name,$res_name,$coram,$judgement_type,$judgement_upload_date);
+						if ($check_is_listed_once == 0) {
+							$save_disposal = save_allocation_temp($db, $schema, $filing_no, $listing_date, $purpose, $court_no, $bench_nature, $get_bench_no, $next_listing_purpose_final, $listing_date, $action_type, $current_status, $sessionUserType, $entry_date, $location_id);
+						} else {
+							if ($listing_date > $saved_last_listing_date) {
+								$update_disposal = update_allocation_temp($db, $schema, $filing_no, $listing_date, $purpose, $court_no, $bench_nature, $get_bench_no, $next_listing_purpose_final, $listing_date, $action_type, $current_status, $sessionUserType, $entry_date, $location_id);
+							}
+						}
+					} else {
+						$next_listing_date_final = $next_listing_date;
+						$next_listing_purpose_final = $next_list_purpose;
+						if ($check_is_listed_once == 0) {
+							$save_disposal = save_allocation_temp($db, $schema, $filing_no, $listing_date, $purpose, $next_court_no, $bench_nature, $get_bench_no, $next_listing_purpose_final, $next_listing_date_final, $action_type, $current_status, $sessionUserType, $entry_date, $location_id);
+						} else {
+							if ($listing_date > $saved_last_listing_date) {
+								$update_disposal = update_allocation_temp($db, $schema, $filing_no, $listing_date, $purpose, $next_court_no, $bench_nature, $get_bench_no, $next_listing_purpose_final, $next_listing_date_final, $action_type, $current_status, $sessionUserType, $entry_date, $location_id);
+							}
+						}
+					}
+					if ($case_status == 'D') {
+						if ($listing_date > $saved_last_listing_date) {
+							$res = update_case_status($db, $schema, $filing_no, $case_status, $legal_aid = 'A');
+						}
+					}
+				}
+
+				if ($case_status == 'P') {
+					// create bench if not exists by checking listing date, court no and coram
+					if ($no_of_judges_count != '') {
+						$bench_creation = 0;
+						$check_bench = check_if_bench_exist($db, $schema, $court_no, $listing_date, $bench_nature);
+						if (!empty($check_bench)) {
+							$is_match = 0;
+							// check coram
+							foreach ($check_bench as $k => $v) {
+								$bench_no = $v['bench_no'];
+								$get_coram = get_coram($db, $schema, $listing_date, $court_no, $bench_nature, $bench_no);
+								$saved_coram = array_map(function ($element) {
+									return $element['judge_code'];
+								}, $get_coram);
+								$saved_coram = implode(',', $saved_coram);
+								if ($coram == $saved_coram) {
+									$is_match = 1;
+									$matched_bench_no = $bench_no;
+									break;
+								}
+							}
+							if ($is_match == 0) {
+								// create bench
+								$get_bench_no = create_bench($db, $schema, $listing_date, $court_no, $bench_nature, $presiding_judge_coram, $location_id, $limit_case = 90, $sessionUserType, $coram_judges, $entry_date);
+							} else {
+								/* $sql_max="select max(bench_no) from $schema.bench where from_list_date = ? and bench_nature = ? and court_no = ?";
+							$sql_max = $db->prepare($sql_max);
+							$sql_max->bindParam(1, $listing_date, PDO::PARAM_STR);
+							$sql_max->bindParam(2, $bench_nature, PDO::PARAM_STR);
+							$sql_max->bindParam(3, $court_no, PDO::PARAM_STR);
+							$sql_max->execute();
+							$get_bench_no = $sql_max->fetchColumn();  */
+								$get_bench_no = $matched_bench_no;
+							}
+						} else {
+							// create bench
+							$get_bench_no = create_bench($db, $schema, $listing_date, $court_no, $bench_nature, $presiding_judge_coram, $location_id, $limit_case = 90, $sessionUserType, $coram_judges, $entry_date);
+						}
+						// create bench end
+					} else {
+						if ($selected_bench_no == '') {
+							$response = array(
+								'status' => 0,
+								'message' => 'bench and custom coram both not entered, either select bench or enter coram'
+							);
+							echo json_encode($response);
+							die;
+						} else {
+							$bench_data = "select court_no,bench_no,bench_nature from $schema.bench where from_list_date = ? and bench_no= ?";
+							$bench_data = $db->prepare($bench_data);
+							$bench_data->bindParam(1, $listing_date, PDO::PARAM_STR);
+							$bench_data->bindParam(2, $selected_bench_no, PDO::PARAM_STR);
+							$bench_data->execute();
+							$bench_data = $bench_data->fetchAll();
+							$bench_data = array_shift($bench_data);
+							$bench_nature = $bench_data['bench_nature'];
+							$get_bench_no = $bench_data['bench_no'];
+							$court_no = $bench_data['court_no'];
+
+							$bench_judges = "select string_agg(cast(judge_code as varchar),',') as judge_codes from $schema.bench_judge where from_list_date = ? and bench_no = ?";
+							$bench_judges = $db->prepare($bench_judges);
+							$bench_judges->bindParam(1, $listing_date, PDO::PARAM_STR);
+							$bench_judges->bindParam(2, $selected_bench_no, PDO::PARAM_STR);
+							$bench_judges->execute();
+							$coram = $bench_judges->fetchColumn();
+						}
+					}
+
+					// save proceeding and order
+					$current_status = $case_status;
+					//$save_in_allocation = save_allocation($db,$schema,$filing_no,$listing_date,$purpose,$court_no,$bench_nature,$get_bench_no,$purpose,$next_listing_date,$action_type,$current_status,$sessionUserType,$entry_date,$location_id);
+					$ins_proceeding = save_proceeding($db, $schema, $filing_no, $listing_date, $purpose, $court_no, $bench_nature, $get_bench_no, $next_list_purpose, $next_listing_date, $action_type, $current_status, $sessionUserType, $entry_date, $location_id, $next_court_no);
+					if ($uploadStatus == 1) {
+						$order_text = get_order_text($parser, $saveTargetFilePath);
+						$ins_order = save_order($db, $schema, $filing_no, $listing_date, $sessionUserType, $flag = 'Y', $get_bench_no, $bench_nature, $court_no, $order_type, $saveTargetFilePath, $fileName, $entry_date, $location_id, $order_upload_date, $coram, $case_type, $case_no, $case_year, $judge_code = null, $pet_name, $res_name, $username, $ip, $order_text);
+					}
+					// save proceeding and order 
+					$check_is_listed_once = check_is_case_listed_once($db, $schema, $filing_no);
+					if ($case_status == 'D') {
+						$judge_code = $presiding_judge;
+						$next_listing_date_final = '1111-11-11';
+						$next_listing_purpose_final = '0';
+						$save_disposal = save_disposal($db, $schema, $filing_no, $disposed_date, $disposed_nature, $bench_nature, $get_bench_no, $court_no, $case_no, $case_type, $case_year, $judge_code, $entry_date, $sessionUserType);
+						//$save_judgement = save_judgement($db,$schema,$filing_no,$disposed_date,$saveTargetFilePathJudgement,$fileNameJudgement,$sessionUserType,$entry_date,$case_type,$case_no,$case_year,$judge_code,$pet_name,$res_name,$coram,$judgement_type,$judgement_upload_date);
+						if ($check_is_listed_once == 0) {
+							$save_disposal = save_allocation_temp($db, $schema, $filing_no, $listing_date, $purpose, $court_no, $bench_nature, $get_bench_no, $next_listing_purpose_final, $listing_date, $action_type, $current_status, $sessionUserType, $entry_date, $location_id);
+						} else {
+							if ($listing_date > $saved_last_listing_date) {
+								$update_disposal = update_allocation_temp($db, $schema, $filing_no, $listing_date, $purpose, $court_no, $bench_nature, $get_bench_no, $next_listing_purpose_final, $listing_date, $action_type, $current_status, $sessionUserType, $entry_date, $location_id);
+							}
+						}
+					} else {
+						$next_listing_date_final = $next_listing_date;
+						$next_listing_purpose_final = $next_list_purpose;
+						if ($check_is_listed_once == 0) {
+							$save_disposal = save_allocation_temp($db, $schema, $filing_no, $listing_date, $purpose, $next_court_no, $bench_nature, $get_bench_no, $next_listing_purpose_final, $next_listing_date_final, $action_type, $current_status, $sessionUserType, $entry_date, $location_id);
+						} else {
+							if ($listing_date > $saved_last_listing_date) {
+								$update_disposal = update_allocation_temp($db, $schema, $filing_no, $listing_date, $purpose, $next_court_no, $bench_nature, $get_bench_no, $next_listing_purpose_final, $next_listing_date_final, $action_type, $current_status, $sessionUserType, $entry_date, $location_id);
+							}
+						}
+					}
+					if ($case_status == 'P') {
+						if ($listing_date > $saved_last_listing_date) {
+							$res = update_case_status($db, $schema, $filing_no, $case_status, $location_id, $legal_aid = 'A');
+						}
+					}
+				}
+				$db->commit();
+				$dbonline->commit();
+				$response =  array('status' => 1, 'message' => 'Case Proceeded');
+				echo json_encode($response);
+			} catch (Exception $e) {
+				// echo $e;
+				// echo "<script>alert('error')</script>";
+				$db->rollBack();
+				$dbonline->rollBack();
+				$response = array(
+					'status' => 0,
+					'message' => 'some error occurred.'
+				);
+			}
+		}
+
+		if ($type == 'dispose_case') {
+			try {
+				$db->beginTransaction();
+				$filing_no = $data['dispose_case_fn'];
+				$disposed_date = (isset($data['disposed_date_new'])) ? $data['disposed_date_new'] : '';
+				$bench_no = (isset($data['bench_no'])) ? $data['bench_no'] : '';
+				if ($disposed_date == '' || $bench_no == '') {
+					$response =  array('status' => 0, 'message' => 'bench and disposal date can not be empty');
+					echo json_encode($response);
+					die;
+				}
+				$server_date = date('d-m-Y'); //Returns IST 
+				if ($server_date != '') {
+					list($day, $month, $year) = explode('-', $server_date);
+					$entry_date = $year . "-" . $month . "-" . $day;
+				}
+				list($day, $month, $year) = explode('/', $disposed_date);
+				$disposed_date = $year . "-" . $month . "-" . $day;
+				$disposed_nature = $data['disposed_nature_new'];
+				$judge_code = $data['presiding_judge_new'];
+				$bench_data = "select court_no,bench_no,bench_nature from $schema.bench where from_list_date = ? and bench_no= ?";
+				$bench_data = $db->prepare($bench_data);
+				$bench_data->bindParam(1, $disposed_date, PDO::PARAM_STR);
+				$bench_data->bindParam(2, $bench_no, PDO::PARAM_STR);
+				$bench_data->execute();
+				$bench_data = $bench_data->fetchAll();
+				$bench_data = array_shift($bench_data);
+				$bench_nature = $bench_data['bench_nature'];
+				$get_bench_no = $bench_data['bench_no'];
+				$court_no = $bench_data['court_no'];
+				$case_detail = "select case_no,case_type,case_year from $schema.case_detail where filing_no = ?";
+				$case_detail = $db->prepare($case_detail);
+				$case_detail->bindParam(1, $filing_no, PDO::PARAM_STR);
+				$case_detail->execute();
+				$case_detail = $case_detail->fetchAll();
+				$case_detail = array_shift($case_detail);
+				$case_no = $case_detail['case_no'];
+				$case_type = $case_detail['case_type'];
+				$case_year = $case_detail['case_year'];
+				$ins_proceeding = save_proceeding($db, $schema, $filing_no, $disposed_date, 0, $court_no, $bench_nature, $bench_no, 0, '1111-11-11', 0, 'D', $sessionUserType, $entry_date, $location_id);
+				$save_disposal = save_disposal($db, $schema, $filing_no, $disposed_date, $disposed_nature, $bench_nature, $bench_no, $court_no, $case_no, $case_type, $case_year, $judge_code, $entry_date, $sessionUserType);
+				$res = update_case_status($db, $schema, $filing_no, 'D', $legal_aid = null);
+				$db->commit();
+				$response =  array('status' => 1, 'message' => 'Case Disposed');
+				echo json_encode($response);
+				die;
+			} catch (Exception $e) {
+				$db->rollBack();
+				$response = array(
+					'status' => 0,
+					'message' => 'some error occurred.'
+				);
+				echo json_encode($response);
+				die;
+			}
+		}
+
+		if ($type == 'is_case_proceeded') {
+			// echo $type;
+			// print_r($data);
+			$case_no = $data['case_no'];
+			$case_year = $data['case_year'];
+			$case_type = $data['case_type'];
+			$case_detail = get_case_detail($db, $schema, $case_no, $case_year, $case_type, $location_id);
+			if (empty($case_detail)) {
+				$response = array('status' => 0, 'message' => 'Case Not Found');
+				echo json_encode($response);
+				die;
+			}
+			if (!empty($case_detail) && count($case_detail) > 1) {
+				$response = array('status' => 0, 'message' => 'Something went wrong');
+				echo json_encode($response);
+				die;
+			}
+			if (!empty($case_detail) && count($case_detail) == 1) {
+				$case_detail = array_shift($case_detail);
+
+				$filing_no = $case_detail['filing_no'];
+				list($d, $m, $y) = explode('/', $data['order_date']);
+				$listing_date = "$y-$m-$d";
+				$check_if_already_proceeded = check_if_already_proceed($db, $schema, $filing_no, $listing_date, '');
+				if ($check_if_already_proceeded > 0) {
+					$response['status'] = 1;
+					$response['message'] = 'Proceeding already completed for this listing date';
+					echo json_encode($response);
+					die;
+				} else {
+					$response['status'] = 0;
+					$response['message'] = '';
+					echo json_encode($response);
+					die;
+				}
+			}
+		}
+	}
+}
+
+
+?>

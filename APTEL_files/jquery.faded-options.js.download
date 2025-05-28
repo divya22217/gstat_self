@@ -1,0 +1,9 @@
+$(function(){
+	$("#faded").faded({
+		speed: 1000,
+		crossfade: true,
+		autoplay: 6000,
+		autopagination:true,
+		autorestart: true
+	});
+});

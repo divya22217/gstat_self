@@ -1,0 +1,1529 @@
+<?php 
+
+header("Cache-Control: private");
+header("Cache-Control: no-cache, no-store, must-revalidate");
+header("Pragma: no-cache");
+header("Cache-Control=proxy-revalidate");
+date_default_timezone_set("Asia/Kolkata");
+include("../db_inc1.php");
+session_start();
+
+$_SESSION['user'];
+$_SESSION['location'];
+$leveladd=$_SESSION['level_level'];
+$localadmin=$_SESSION['localadmin'];
+$main_id=$_SESSION['main_id'];
+
+
+$schemas=htmlspecialchars($_SESSION['schema_name']);
+
+
+$userid=$_SESSION['id'];
+
+if($_SESSION['user'] == '' and $_SESSION['location'] =='')
+{
+	echo "Access Problem.....";
+	header("Location: ../login.php");
+	die();
+}
+ $c_case=$_REQUEST['ccase'];
+ 
+ $subdoctyp=$_REQUEST['subdoctyp'];
+ 
+	
+function remove_path($file, $path = UPLOAD_PATH) {
+if(strpos($file, $path) !== FALSE) {
+return substr($file, strlen($path));
+}
+}
+
+setcookie("PHPSESSID","",time()-3600,"","",TRUE,TRUE);
+
+
+$_SESSION['csrf'] = md5(uniqid(rand(), TRUE));
+$key=$_SESSION['csrf'];
+
+// At the top of the page we check to see whether the user is logged in or not
+if(empty($_SESSION['user']) and $_SESSION['location']=='')
+{
+	die("#2E2E2Eirecting to login.php");
+}
+
+if($_SESSION['user'] !='' and $_SESSION['location'] !='')
+{
+
+	function display_filing_no($filing_no_display){
+		$lastFour =  substr($filing_no_display,-4);
+		$lastFive = substr($filing_no_display,-9,-4);
+		$left = substr($filing_no_display,-16,-9);
+		return $dis_fil_no = $left.'/<b>'.$lastFive.'/'.$lastFour.'</b>';
+
+}
+	 $filing_no_next=$_REQUEST['filing_no_next'];
+	$subdoctype=$_REQUEST['subdoctype'];
+	
+	$hash1=htmlspecialchars(base64_decode($filing_no_next));
+	$hash1 = explode("-", $hash1);
+	  $filing_no_fou=$hash1[0];
+	
+	$token_fou= $hash1[1];
+
+	if($c_case=='2')
+{
+	 $miscellaneous_ref_no_post= $hash1[2];
+}
+if($c_case=='4')
+{
+	 $miscellaneous_ref_no_post= $hash1[2];
+}
+
+if($c_case=='3')
+{
+   $ia_id=$hash1[2];
+
+}
+
+if($_SESSION['qqcc'] != $token_fou)	
+{
+	echo "Access Problem.....";
+	header("Location: ../login.php?aa=100");
+	die();
+}
+	if($token_fou =='')
+	{
+		echo "Access Problem.....";
+		header("Location: ../login.php?aa=100");
+		die();
+	}
+	
+	
+
+	// This code not use next time .......	Schema session create Hear....
+
+	$location_access=$_SESSION['location'];
+	$sessionUserType=htmlspecialchars($_SESSION['id']);
+
+
+	$curYear = htmlspecialchars(date("Y"));
+	$curMonth = htmlspecialchars(date("m"));
+	$curDay = htmlspecialchars(date("d"));
+	$cur_date = "$curYear-$curMonth-$curDay";
+	$cur_date1 ="$curDay/$curMonth/$curYear";
+
+ 
+include '../inheader.php';
+include '../insidebar.php';
+
+?>
+<?php 
+
+$form2 = sha1( uniqid('auth', true) );
+$_SESSION['form2_scruniny'] = $form2;
+?>
+
+
+  <script>
+  /*$( window ).load(function() {
+	  alert('sadsad');
+console.log( "window loaded" );
+myFunction();
+
+});
+  */
+  </script>
+  <body onload="myFunction()">
+ <!-- Content Wrapper. Contains page content -->
+  <div class="content-wrapper">
+    <!-- Content Header (Page header) -->
+   
+    <!-- Main content -->
+    <section class="content">
+      <?php 
+        		$hash=$_REQUEST['hash'];
+        		
+        		if($hash !='')
+        		{
+        		 
+        			$hash1=htmlspecialchars(base64_decode($hash));
+        			$hash1 = explode("/", $hash1);
+        			$massage=$hash1[0];
+        			$filing_no_backpage = $hash1[1];
+        			$filing_no_backpage_print=htmlspecialchars(base64_decode($filing_no_backpage));
+        			
+        			echo "<center></br><font color='red' size='4'>".htmlspecialchars($msg).'</br>';
+        		
+         } 
+         ?>
+      <!-- Default box -->
+      <div class="col-md-12">
+      <div class="box">
+        <div class="box-header with-border">
+          <h4 class="box-title">Case Scurtiny &nbsp;&nbsp;
+ Diary No : <?php echo display_filing_no($filing_no_fou);?>
+ &nbsp;&nbsp;
+ <?php 
+
+include '../db_inc2.php';
+	
+	$st1=$dbonline->prepare("select * from e_case_detail where filing_no=? and location_id=? ");
+	$st1->bindParam(1, $filing_no_fou, PDO::PARAM_STR);
+	$st1->bindParam(2, $location_access, PDO::PARAM_STR);
+	$st1->execute();
+	while ($row = $st1->fetch(PDO::FETCH_ASSOC,PDO::FETCH_ORI_NEXT))
+	{
+		
+	    $filing_no = htmlspecialchars($row['filing_no']);
+		
+		$dt_of_filing = htmlspecialchars($row['dt_of_filing']);
+		  $case_type=htmlspecialchars($row['case_type']);
+		$case_no=$row['case_no'];
+		$location_id=$row['state'];
+		$act_id=$row['act_id'];
+	}
+	
+	$stqq = $dbonline->prepare("select act_name from master_act where act_id=?");
+	$stqq->bindParam(1, $act_id, PDO::PARAM_INT);
+	$stqq->execute();
+	$act_name_all = $stqq->fetchColumn();
+        
+	$E_party_flag1='P';
+	  $E_party_serial_no1='1';
+	
+		$st33=$dbonline->prepare("select * from e_cases_party where filing_no=? and party_flag=? and party_serial_no=? ");
+		$st33->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$st33->bindParam(2, $E_party_flag1, PDO::PARAM_STR);
+		$st33->bindParam(3, $E_party_serial_no1, PDO::PARAM_STR);
+		$st33->execute();
+		
+		while ($row = $st33->fetch(PDO::FETCH_ASSOC,PDO::FETCH_ORI_NEXT))
+		{
+		
+			$E_party_flagP=$row['party_flag']; 
+			$E_party_serial_noP=$row['party_serial_no']; //0
+			$E_nameP=$row['name']; //0
+			$E_party_org_typeP=$row['party_org_type']; //0
+			$E_party_org_contact_personP=$row['party_org_contact_person']; 
+			$E_party_addressP=$row['party_address']; 
+			$E_pinP=$row['pin']; //0
+			$E_state_codeP=$row['state_code']; //0
+			$E_district_codeP=$row['district_code']; //0
+			$E_nationalityP=$row['nationality']; 
+			$E_emailP=$row['email']; 
+			$E_mobileP=$row['mobile']; 
+			$E_representative_codeP=$row['representative_code']; //0
+			$E_aadhar_noP=$row['aadhar_no']; //0
+			 $E_cin_noP=$row['cin_no']; //0
+		}	
+	
+		$E_party_flag1='R';
+		$E_party_serial_no1='1';
+		$st34=$dbonline->prepare("select * from e_cases_party where filing_no=? and party_flag=? and party_serial_no=? ");
+		$st34->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$st34->bindParam(2, $E_party_flag1, PDO::PARAM_STR);
+		$st34->bindParam(3, $E_party_serial_no1, PDO::PARAM_STR);
+		$st34->execute();
+		while ($row = $st34->fetch(PDO::FETCH_ASSOC,PDO::FETCH_ORI_NEXT))
+		{
+		
+			$E_party_flagR=$row['party_flag'];
+			$E_party_serial_noR=$row['party_serial_no']; //0
+			$E_nameR=$row['name']; //0
+			$E_party_org_typeR=$row['party_org_type']; //0
+			$E_party_org_contact_personR=$row['party_org_contact_person'];
+			$E_party_addressR=$row['party_address'];
+			$E_pinR=$row['pin']; //0
+			$E_state_codeR=$row['state_code']; //0
+			$E_district_codeR=$row['district_code']; //0
+			$E_nationalityR=$row['nationality'];
+			$E_emailR=$row['email'];
+			$E_mobileR=$row['mobile'];
+			$E_representative_codeR=$row['representative_code']; //0
+			$E_aadhar_noR=$row['aadhar_no']; //0
+			$E_cin_noR=$row['cin_no']; //0
+		}
+	?>
+	<font color="#0000FF" >
+     <?php
+ $E_nameP= htmlspecialchars_decode($E_nameP,ENT_NOQUOTES);
+					$E_nameR= htmlspecialchars_decode($E_nameR,ENT_NOQUOTES);
+
+	 echo strtoupper($E_nameP).'&nbsp; Vs. &nbsp;'.strtoupper($E_nameR);?></font>
+ </h4>
+          <div class="box-tools pull-right">
+            <button type="button" class="btn btn-box-tool" data-widget="collapse" data-toggle="tooltip" title="Collapse">
+              <i class="fa fa-minus"></i></button>
+            <button type="button" class="btn btn-box-tool" data-widget="remove" data-toggle="tooltip" title="Remove">
+              <i class="fa fa-times"></i></button>
+          </div>
+        </div>
+        <div class="box-body">
+         
+ <div class="form-group">
+				 <div class="col-md-6">
+             
+       <script>
+       function defect_submit()
+       {
+       	//validate3();
+       	
+        	with(document.form2)
+       	{	
+		
+		
+				//var r = $( "#in_searchby" ).val();	
+			
+               var current_status = $("#in_searchby").val();
+			   //current_status = $.trim(current_status);
+			   if(current_status == '1'){
+					var cause_number = $("#cause_no").val();
+					if(cause_number == ''){
+						alert("please select any Error in Option");
+						return false;
+					}
+			   }
+			  
+			   
+		
+		
+        		var validformat=/^\d{2}\/\d{2}\/\d{4}$/ 
+        			if (!validformat.test(notification_date.value))
+        			{	
+        			alert("Invalid Date Format. Correct Date Format (dd/mm/yyyy)")
+        			return false; 
+        			}
+
+        		if(searchby.options[searchby.selectedIndex].value == "0")
+         		{
+         			alert("Please Select Defect/ Defect Free  ");
+         			searchby.focus();
+         			return false;
+         		}
+
+        		var status1="";
+        		//alert('self submit');	
+        			var tnl=document.getElementsByName("status");
+        		for(i=0;i<tnl.length;i++)
+            		{
+        	        
+                	var val= tnl[i].value;
+                     var status1=status1+val+','
+                       }
+        		if(!document.getElementById('agree').checked)
+        		 {
+        		     alert('You must agree to the terms first.');
+        		     //agree.focus();
+        		     return false;
+        		 }
+				 if(!document.getElementById('agree').checked)
+        		 {
+        		     alert('You must agree to the terms first.');
+        		     //agree.focus();
+        		     return false;
+        		 }
+
+        		
+       	 action = "scrutiny_action1.php?test="+status1;
+       	submit();
+       	document.form2.submit_final.disabled = true;  
+      	document.form2.submit_final.value = 'Please Wait...';  
+      	return true;
+       	}
+       }
+
+			 function draft_checklist(){
+				 
+				 var current_status = $("#in_searchby").val();
+			   //current_status = $.trim(current_status);
+			   if(current_status == '1'){
+					var cause_number = $("#cause_no").val();
+					if(cause_number == ''){
+						alert("please select  Error in Option");
+						return false;
+					}
+			   }
+        
+				//for gen
+        var status = [];
+        $.each($(".statuscheck option:selected"), function(){            
+            status.push($(this).val());
+        });
+        
+			var id_checklist = $('input[name="id_check_draft[]"]').map(function() {
+        return this.value
+		}).get()		
+
+		var comment = [];
+        $.each($(".comment"), function(){            
+					comment.push($(this).val());
+        });
+
+		//for others
+		var statusother = [];
+        $.each($(".statuscheckother option:selected"), function(){            
+            statusother.push($(this).val());
+        });
+ 
+			var id_checklist_other = $('input[name="id_check_draft_other[]"]').map(function() {
+        return this.value
+		}).get()
+
+		var comment_other = [];
+        $.each($(".comment_other"), function(){            
+					comment_other.push($(this).val());
+        });
+		//alert(comment_other);
+		var cause_no = [];
+        $.each($("#cause_no"), function(){            
+					cause_no.push($(this).val());
+        });
+		console.log(cause_no);
+		var obj_sub_name=$('#draft_id').text();
+		if(obj_sub_name=='First Motion' || obj_sub_name=='Second Motion' || obj_sub_name=='IBC Act'|| obj_sub_name=='Company Petition'){
+			obj_sub_code = 1;
+		} else{
+			obj_sub_code = 0;
+		}
+      var cause_no = JSON.stringify(cause_no);
+		var comment = JSON.stringify(comment);
+		var comment_other = JSON.stringify(comment_other);
+    var status = JSON.stringify(status);
+		var checklist = JSON.stringify(id_checklist);
+
+		var statusother = JSON.stringify(statusother);
+		var id_checklist_other = JSON.stringify(id_checklist_other);
+		
+		var obj_sub_code = JSON.stringify(obj_sub_code);
+		var filing_no = JSON.stringify(filing_no);
+    
+		var filing_no = document.getElementById("draft_filing_no").value;
+		
+		
+		
+    
+	var miscellaneous_ref_no_post = document.getElementById("miscellaneous_ref_no_post").value;
+		var miscellaneous_ref_no_post = JSON.stringify(miscellaneous_ref_no_post);
+		
+		var scrutiny_level_value = document.getElementById("scrutiny_level_value").value;
+		
+		var c_case = JSON.stringify(c_case);
+    
+		var c_case = document.getElementById("c_case").value;
+		var subdoctype = JSON.stringify(subdoctype);
+    
+		var subdoctype = document.getElementById("subdoctype").value;
+		var scrutiny_level_value = document.getElementById("scrutiny_level_value").value;
+	
+		//var filing_no = filing_no.toString();
+		var user_id = document.getElementById("user_id").value;
+
+  	var request = $.ajax({
+			 type: "POST",
+        url: "draft_checklist_save.php",
+        data: {status : status, checklist : checklist, filing_no : filing_no, user_id : user_id, obj_sub_code : obj_sub_code, statusother : statusother, id_checklist_other : id_checklist_other, comment : comment, comment_other : comment_other,miscellaneous_ref_no_post:miscellaneous_ref_no_post,c_case:c_case,subdoctype:subdoctype,cause_no : cause_no}, 
+        cache: false,
+ 	});
+ 
+	request.done( function ( data ) {
+		console.log(data);
+ 		$('#ajaxButton').html( data );
+		$(".alert").show();
+		$( ".alert" ).fadeOut( 5000, function() {
+    // Animation complete.
+  });
+ 	});
+ 
+	request.fail( function ( jqXHR, textStatus) {
+ 		console.log( 'Sorry: ' + textStatus );
+ 	});
+ 
+}
+       </script> 
+        <script>
+/* function myFunction() {
+
+	 with(document.form2)
+   	{ 
+
+		 var tnl = document.getElementById("status");
+         
+	        for(i=0;i<tnl.length;i++){
+	            if(tnl[i].selected == true){
+	                alert(tnl[i].value);
+	            }
+	        }
+
+
+	
+   	}
+}
+ */
+
+
+function myFunction(){
+	
+	var tnl=document.getElementsByName("status");
+	
+    var val1=""
+     
+   for(i=0;i<tnl.length;i++){
+        
+        	var val= tnl[i].value;
+             if(val=='NO')
+                 {
+                 val1='NO';
+				 	document.getElementById("befornotification1").style.display ='block';
+				 	$(".rr").show();
+
+             } 
+        
+       
+    }
+	
+    if(val1=="")
+    {
+    	val1='YES';
+		$(".rr").hide();
+    }
+	
+
+
+	 if (window.XMLHttpRequest) {
+         
+         xmlhttp = new XMLHttpRequest();
+     } else {
+      
+         xmlhttp = new ActiveXObject("Microsoft.XMLHTTP");
+     }
+     xmlhttp.onreadystatechange = function() {
+         if (this.readyState == 4 && this.status == 200) {
+             document.getElementById("befornotification1").innerHTML = this.responseText;
+         }
+     };
+     xmlhttp.open("GET","notificationdate.php?val="+val1,true);
+     xmlhttp.send();
+
+  
+	document.getElementById("befornotification1").style.display ='block';
+	document.getElementById("befornotification").style.display ='none';
+
+} 
+
+
+
+</script>   
+<script type="text/javascript" src="accordion.js"></script> 
+<script type="text/javascript" src="jquery.min.js"></script>
+<link href="demo.css" rel="stylesheet">
+<style>
+button.accordion {
+    background-color: #eee;
+    color: #444;
+    cursor: pointer;
+    padding: 18px;
+    width: 100%;
+    border: none;
+    text-align: left;
+    outline: none;
+    font-size: 15px;
+    transition: 0.4s;
+}
+
+button.accordion.active, button.accordion:hover {
+    background-color: #ddd; 
+}
+
+div.panel {
+    padding: 0 18px;
+    display: none;
+    background-color: white;
+}
+</style>
+<script>
+var acc = document.getElementsByClassName("accordion");
+var i;
+
+for (i = 0; i < acc.length; i++) {
+  acc[i].onclick = function() {
+    this.classList.toggle("active");
+    var panel = this.nextElementSibling;
+    if (panel.style.maxHeight){
+      panel.style.maxHeight = null;
+    } else {
+      panel.style.maxHeight = panel.scrollHeight + "px";
+    } 
+  }
+}
+</script>    
+       <?php 
+       $remove_defact = sha1( uniqid('auth', true) );
+       $_SESSION['remove_defact'] = $remove_defact;
+       
+      
+       ?>       
+              
+  <form name="form2" method="post" action="scrutiny_action1.php" >
+  <input type="hidden" name="form2" value="<?php echo htmlspecialchars($form2);?>" />
+   <input type="hidden" name="filing_no_next" value="<?php echo htmlspecialchars($filing_no_next);?>" />
+   <table width="100%" >
+     
+			<tr><td colspan="6">
+			<?php 
+			
+				
+			
+			 $tokenno=$filing_no_fou;	  
+
+	 
+?>
+			</td></tr>
+        </table>
+
+ <?php 
+
+ if($tokenno !='')
+ {
+ ?>
+
+<tr>
+    <td colspan="8">
+    <style>
+.tbl-accordion {
+  margin: 0 auto;
+  width: 900px;
+  border: 1px solid #d9d9d9;
+}
+.tbl-accordion thead {
+  background: #d9d9d9;
+}
+.tbl-accordion .tbl-accordion-nested {
+  width: 100%;
+}
+.tbl-accordion .tbl-accordion-nested tr:nth-child(even) {
+  background-color: #eeeeee;
+}
+.tbl-accordion .tbl-accordion-nested td, .tbl-accordion .tbl-accordion-nested th {
+  padding: 10px;
+  border-bottom: 1px solid #d9d9d9;
+}
+.tbl-accordion .tbl-accordion-nested .tbl-accordion-section {
+  background: #333;
+  color: #fff;
+  cursor: pointer;
+}
+  </style>
+  
+  <script>
+$('.tbl-accordion-nested').each(function()
+		  {
+	  var thead = $(this).find('thead');
+	  var tbody = $(this).find('tbody');
+	  
+	  tbody.hide();
+	  thead.click(function(){
+	    tbody. slideToggle();
+	  })
+	})
+	
+  </script>
+  
+<table cellpadding="0" cellspacing="0" class="tbl-accordion">
+<tbody>
+    <tr>
+      <td colspan="3">
+        <table cellpadding="0" cellspacing="0" border='1' class="tbl-accordion-nested">
+         <thead>
+            <tr>
+              <td  class="tbl-accordion-section">Documents </td><td><b> Case Detail </b></td>
+            </tr>
+			
+			
+			
+			<tr>
+             
+			 
+			<?php 
+			
+			$sthr=$dbonline->prepare("select * from e_case_detail  where filing_no=? ");
+  $sthr->bindParam(1, $tokenno, PDO::PARAM_STR);
+  $sthr->execute();
+  while ($rowa = $sthr->fetch(PDO::FETCH_ASSOC,PDO::FETCH_ORI_NEXT))
+  {
+  	$fileupload_uniqueid=$rowa['unique_id_no'];
+  	  
+  }  	
+	 $ccase=$_REQUEST['ccase'];
+	if($ccase==2)
+			{
+			$display='1';
+            $scrutiny='0';
+			$form_status="C";
+			}
+			if($ccase==4)
+			{
+			$display='1';
+            $scrutiny='0';
+			$form_status="R";
+			}	
+			elseif($ccase==1 || $ccase==5)
+			{
+	$display='1';
+    $scrutiny='0';
+	$form_status="F";
+			}
+			elseif($ccase==3)
+			{
+	$display='1';
+    $scrutiny='0';
+	$form_status="I";
+			}
+			?>
+			<input type="hidden" name="form_status" value="<?php echo htmlspecialchars(htmlentities($form_status));?>"/>  
+			<?php 
+			
+	 $st=$dbonline->prepare("select *  from document_upload where filing_no=? and scrutiny=? and display=?  ");
+	 $st->bindParam(1, $tokenno, PDO::PARAM_STR);
+	 $st->bindParam(2, $scrutiny, PDO::PARAM_STR);
+	 $st->bindParam(3, $display, PDO::PARAM_STR);
+	 $st->execute();
+	 while ($rowa = $st->fetch(PDO::FETCH_ASSOC,PDO::FETCH_ORI_NEXT))
+		{
+		      $fil_no=$rowa['filing_no'];
+		 $sub_doc_type=$rowa['subdoctype'];
+		 	
+		
+		$document_filed_date=$rowa['document_filed_date'];
+          	  $path =$rowa['fileupload'];    
+			  $returnfilename =$rowa['returnfilename']; 
+			 
+	list($returnfilename,$ext)=explode('.',$returnfilename);
+       $returnfilename1=$returnfilename;		 
+        
+		
+
+ $stqq = $dbonline->prepare("select e_document_name from e_document_type  where e_document_type=?");
+            $stqq->bindParam(1, $sub_doc_type, PDO::PARAM_INT);
+            $stqq->execute();
+			
+			 $e_document_name_print = $stqq->fetchColumn(); 
+			}	 
+				 
+				 
+		?>
+			 </thead>
+          <tbody>
+		  
+		   <!--start of code for case no. -->
+		   
+		   <?php
+if($ccase == '2') {
+           //echo "select case_type, case_no, case_year, location_code from $schemas.case_detail where filing_no='$filing_no'";
+		   $casenosql=$db->prepare("select case_type, case_no, case_year, location_code from $schemas.case_detail where filing_no='$filing_no'");
+                 $casenosql->execute(); 
+				 $row = $casenosql->fetch();
+				  $case_no = htmlspecialchars($row['case_no']);
+				 //echo $case_no;
+				 $case_no = ltrim($case_no,0);
+				 //echo $case_no;
+				 $casetype = htmlspecialchars($row['case_type']);
+				 //echo $casetype;
+				 $locode = htmlspecialchars($row['location_code']);
+				 //echo $locode;
+				 $case_year = htmlspecialchars($row['case_year']);
+				 //echo $case_year;
+				
+				 $casetypesql = $db->prepare("select case_type_desc from case_type where id = '$casetype'");
+                 $casetypesql->execute();
+                 $case_type_short_name=$casetypesql->fetchColumn();
+				 $case_type_short_name = strtoupper($case_type_short_name);
+				 //echo $case_type_short_name;
+				 if($locode=='')
+   {
+	   $locode=0;
+   }
+				 $lcodesql ="select short_name from $schemas.bench_location where bench_location_code ='$locode'";
+                 $lcodesql=$db->prepare($lcodesql);
+                 $lcodesql->execute();
+                 $lcodename = $lcodesql->fetchColumn();
+				 //echo $lcodename;
+				 
+				 $case_no_final = $case_type_short_name.'/'.$case_no.'('.$lcodename.')'.$case_year;
+				 //echo $case_no_final;
+	 
+			
+			//$case_no_final = 0999988888;
+}
+	  ?>		   
+		  
+			  <td>
+<a  onclick="OpenDMSForm('http://efiling.nclt.gov.in/dms-ecourt/ecourt-search-within-review-dms','<?php echo $filing_no; ?>','<?php echo $fileupload_uniqueid; ?>','','<?php echo $case_no_final; ?>','<?php echo $case_type;?>','<?php echo $E_nameP ?>','<?php echo $E_nameP."  "; ?>Vs.<?php echo "  ".$E_nameR;?>','P','vVl/Az1yGsjOAG18WDeScg==','!TZFIMZbTiUtqXMfARJ1DGgyNicWFwYkwTA0ip/Q8Wns=')" style="cursor: pointer">
+
+<font color="#900C3F" size="3">&nbsp;&nbsp;
+  &nbsp;&nbsp;View</a>
+
+            </td>
+	<td colspan="5">
+				
+				<a  target="_blank" href="http://efiling.nclt.gov.in/previewCIS.drt?filingNo=<?php echo $filing_no ?>"><font color="#900C3F" size="3">&nbsp;&nbsp;View
+
+
+ </a>
+				
+				
+				
+			
+			</td>		
+			
+			
+			
+			</tr>
+		
+			<?php
+			if($ccase == '2') {
+						//echo "select *  from document_upload where filing_no='$filing_no_fou' and scrutiny='$scrutiny' and display='$display'  ";
+ $get_mis_no_doc=$dbonline->prepare("select *  from document_upload where filing_no=? and miscellaneous_ref_no=? and scrutiny=? and display=?  ");
+ $get_mis_no_doc->bindParam(1, $filing_no_fou, PDO::PARAM_STR);
+ $get_mis_no_doc->bindParam(2, $miscellaneous_ref_no_post, PDO::PARAM_STR);
+ $get_mis_no_doc->bindParam(3, $scrutiny, PDO::PARAM_STR);
+ $get_mis_no_doc->bindParam(4, $display, PDO::PARAM_STR);
+ $get_mis_no_doc->execute();
+ $doc_c = 1;
+ while ($row_mnd = $get_mis_no_doc->fetch(PDO::FETCH_ASSOC,PDO::FETCH_ORI_NEXT))
+ {
+	$miscellaneous_ref_no =$row_mnd['miscellaneous_ref_no'];
+	$doc_id=$row_mnd['documentuploadmodelid'];
+	if($miscellaneous_ref_no){?>
+		<tr><td><?php echo $doc_c."). ".$miscellaneous_ref_no; ?></td>
+ </tr>
+ <?php
+ $doc_c++;
+	}else{?>
+		<tr><td><?php echo "Not Found";?></td>
+		</tr>
+	<?php } 
+ }
+}
+ ?>
+		
+<?php
+			
+	
+	
+			if($ccase == '4') {
+				if($subdoctype =='17')
+				{
+					$subdocname='Report';
+					$form_type='R';
+					
+				}
+				if($subdoctype =='33')
+				{
+					$subdocname='Order';
+					$form_type='O';
+					
+				}
+	
+						//echo "select *  from document_upload where filing_no='$filing_no_fou' and scrutiny='$scrutiny' and display='$display'  ";
+ $get_mis_no_doc=$dbonline->prepare("select *  from document_upload where filing_no=? and miscellaneous_ref_no=? and scrutiny=? and display=? and subdoctype=? and party_type IN (select party_flag from e_master_govt_body) ");
+ $get_mis_no_doc->bindParam(1, $filing_no_fou, PDO::PARAM_STR);
+ $get_mis_no_doc->bindParam(2, $miscellaneous_ref_no_post, PDO::PARAM_STR);
+ $get_mis_no_doc->bindParam(3, $scrutiny, PDO::PARAM_STR);
+ $get_mis_no_doc->bindParam(4, $display, PDO::PARAM_STR);
+  $get_mis_no_doc->bindParam(5, $subdoctype, PDO::PARAM_STR);
+ $get_mis_no_doc->execute();
+ $doc_c = 1;
+ while ($row_mnd = $get_mis_no_doc->fetch(PDO::FETCH_ASSOC,PDO::FETCH_ORI_NEXT))
+ {
+	$miscellaneous_ref_no =$row_mnd['miscellaneous_ref_no'];
+	$report_party_type =$row_mnd['party_type'];
+	$doc_id=$row_mnd['documentuploadmodelid'];
+	if($miscellaneous_ref_no){?>
+		<tr><td><?php echo $miscellaneous_ref_no." (".$subdocname.")"; ?></td>
+ </tr>
+ <?php
+ $doc_c++;
+	}else{?>
+		<tr><td><?php echo "Not Found";?></td>
+		</tr>
+	<?php } 
+ }
+}
+ ?>
+		
+
+
+</tbody>
+</table>
+</td></tr>
+</table>
+  </td>
+</tr>	
+ </div>
+ </div>
+   </div>
+ <div class="box-footer">
+    <style>
+    .greenText{ background-color:green; }
+
+.blueText{ background-color:blue; }
+
+
+    </style>
+      <div class="main">
+		<div class="accordion">
+		
+<?php 
+
+
+
+?>		
+		
+     <div class="accordion-section">
+				<a class="accordion-section-title" href="#accordion-1"><?php echo htmlspecialchars("General");?></a>
+				<div id="accordion-1" class="accordion-section-content">
+				
+				
+		 <table border="1" >
+  <tr><td colspan="12"></td></tr>
+  <tr style="background-color:#6D6968 ;text-align: center; color: #FFFFFF;">
+  <td width="3%">Sr. No</td><td width="67%">Description</td><td width="6%">Defect Free</td><td width="16%">Comments</td>
+  </tr>
+ <tr><td colspan="12">
+ 
+    <?php //$status=$_REQUEST['status'];
+
+ ?>
+
+ <?php 
+ 
+  
+  $display='TRUE';
+
+  $sth=$db->prepare("select * from check_list_local order by id ASC ");
+  //$sth->bindParam(1, $location_access, PDO::PARAM_STR);
+$sth->execute();
+$i=0;
+$j=1;
+while ($rowa = $sth->fetch(PDO::FETCH_ASSOC,PDO::FETCH_ORI_NEXT))
+{
+	
+  $id_check=$rowa['id'];
+ $obj_sub_code = 0;
+ $level_level = 0;
+
+    //check draft record exist or not
+	if($c_case==1 || $c_case==3 || $c_case==5)
+	{
+		//$frm_type='R';
+		//$frm_type1='O';
+		$level_level='0';
+		
+    $check_record_exist = $db->prepare("select display from $schemas.draft_objection_details where filing_no=? and objection_code=? and objection_sub_code=? and user_id=? and level_level=? and form_type IS NULL");
+          $check_record_exist->bindParam(1, $filing_no, PDO::PARAM_STR);
+					$check_record_exist->bindParam(2, $id_check, PDO::PARAM_STR);
+					$check_record_exist->bindParam(3, $obj_sub_code, PDO::PARAM_STR);
+					$check_record_exist->bindParam(4, $userid, PDO::PARAM_STR);
+					$check_record_exist->bindParam(5, $level_level, PDO::PARAM_STR);
+					//$check_record_exist->bindParam(6, $frm_type, PDO::PARAM_STR);
+					//$check_record_exist->bindParam(7, $frm_type1, PDO::PARAM_STR);
+          $check_record_exist->execute();
+					$display_for_chk= $check_record_exist->fetchColumn();
+					if($display_for_chk){
+				 $sql="select status,comment,scrutiny_correction from $schemas.draft_objection_details where filing_no='$filing_no' and objection_code='$id_check' and objection_sub_code='$obj_sub_code'and user_id='$userid' and level_level='$level_level' and  form_type IS NULL";
+					}else{
+
+ $sql="select status,comments,scrutiny_correction from $schemas.objection_details where filing_no='$filing_no' and objection_code='$id_check' and objection_sub_code='$obj_sub_code' and form_type IS NULL";
+					}
+					
+	}
+
+
+	
+		if($c_case==2)
+	{
+		//$frm_type='R';
+		//$frm_type1='O';
+		$level_level='0';
+		
+    $check_record_exist = $db->prepare("select display from $schemas.draft_objection_details where filing_no=? and objection_code=? and objection_sub_code=? and user_id=? and level_level=? and miscellaneous_ref_no=? and form_type IS NULL");
+          $check_record_exist->bindParam(1, $filing_no, PDO::PARAM_STR);
+					$check_record_exist->bindParam(2, $id_check, PDO::PARAM_STR);
+					$check_record_exist->bindParam(3, $obj_sub_code, PDO::PARAM_STR);
+					$check_record_exist->bindParam(4, $userid, PDO::PARAM_STR);
+					$check_record_exist->bindParam(5, $level_level, PDO::PARAM_STR);
+					$check_record_exist->bindParam(6, $miscellaneous_ref_no_post, PDO::PARAM_STR);
+					//$check_record_exist->bindParam(7, $frm_type1, PDO::PARAM_STR);
+          $check_record_exist->execute();
+					$display_for_chk= $check_record_exist->fetchColumn();
+					if($display_for_chk){
+				 $sql="select status,comment from $schemas.draft_objection_details where filing_no='$filing_no' and objection_code='$id_check' and objection_sub_code='$obj_sub_code'and user_id='$userid' and level_level='$level_level' and miscellaneous_ref_no='$miscellaneous_ref_no_post' and  form_type IS NULL";
+					}else{
+
+ $sql="select status,comments from $schemas.objection_details where filing_no='$filing_no' and objection_code='$id_check' and objection_sub_code='$obj_sub_code' and miscellaneous_ref_no='miscellaneous_ref_no_post' and form_type IS NULL";
+					}
+					
+	}
+	
+	
+	if($c_case==4)
+	{
+		//$form_type='R';
+	if($subdoctype =='17')
+				{
+					//$subdocname='Report';
+					$form_type='R';
+					
+				}
+				if($subdoctype =='33')
+				{
+					//$subdocname='Order';
+					$form_type='O';
+					
+				}	
+    $check_record_exist = $db->prepare("select display from $schemas.draft_objection_details where filing_no=? and objection_code=? and objection_sub_code=? and user_id=? and level_level=? and miscellaneous_ref_no=? and form_type=?");
+          $check_record_exist->bindParam(1, $filing_no, PDO::PARAM_STR);
+					$check_record_exist->bindParam(2, $id_check, PDO::PARAM_STR);
+					$check_record_exist->bindParam(3, $obj_sub_code, PDO::PARAM_STR);
+					$check_record_exist->bindParam(4, $userid, PDO::PARAM_STR);
+					$check_record_exist->bindParam(5, $level_level, PDO::PARAM_STR);
+					$check_record_exist->bindParam(6, $miscellaneous_ref_no_post, PDO::PARAM_STR);
+					$check_record_exist->bindParam(7, $form_type, PDO::PARAM_STR);
+
+					$check_record_exist->execute();
+									
+					  $display_for_chk= $check_record_exist->fetchColumn();
+					
+					if($display_for_chk){
+					$sql="select status,comment from $schemas.draft_objection_details where filing_no='$filing_no' and objection_code='$id_check' and objection_sub_code='$obj_sub_code'and user_id='$userid' and level_level='$level_level' and miscellaneous_ref_no='$miscellaneous_ref_no_post' and form_type='$form_type'";
+					}else{
+
+$sql="select status,comments from $schemas.objection_details where filing_no='$filing_no' and objection_code='$id_check' and objection_sub_code='$obj_sub_code' and miscellaneous_ref_no='$miscellaneous_ref_no_post' and form_type='$form_type' ";
+					}
+					
+	}
+
+$stq=$db->prepare($sql);
+//$stq->bindParam(1, $filing_no, PDO::PARAM_INT);
+//$stq->bindParam(2, $id_check, PDO::PARAM_INT);
+$stq->execute();
+	 //$status = $stq->fetchColumn();
+	
+	 while ($row_stq = $stq->fetch(PDO::FETCH_ASSOC,PDO::FETCH_ORI_NEXT))
+	 {  
+										$status = $row_stq['status'];  
+										$status=trim($status);
+										 $cause_no = $row_stq['scrutiny_correction'];
+										$explode_cause_no = explode(',',$cause_no);
+										   $comment = $row_stq['comment'];
+										  $comment1 = $row_stq['comments'];
+	 }
+
+ $check_list=$rowa['check_list'];
+
+?> 
+  <tr>
+ 
+  <td width="5%">
+ 
+  <?php echo htmlspecialchars($id_check);?>
+   
+  </td>
+
+  
+  <td width="60%" ><font color=" #1c2833 "><?php echo htmlspecialchars($check_list);?></font>
+  
+  
+ 
+  <td width="7%">
+
+ 
+				 <select name="status" id="status" class="statuscheck" onchange="myFunction()" style="
+    background-color: silver;
+    color: #000000;
+    padding: 7px 7px;
+    margin: 2px 0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;"   >
+	<?php //$status = "NO"; ?>
+	            <option value="YES" <?php  if(trim($status)=='YES') echo "selected"; ?> >YES</option>
+	            <option value="NO" <?php  if(trim($status)=='NO') echo "selected"; ?> ><font color="red">NO</font></option>
+				<option value="NA" <?php  if(trim($status)=='NA') echo "selected"; ?> >NA</option>
+ 				 	
+                 </select> 
+								 <input type="hidden" id="id_check_draft" value='<?php echo htmlspecialchars($id_check);?>' name="id_check_draft[]">
+								 </td>          
+  
+  <td width="20%">
+  <?php
+ 
+if($comment1!='')
+{
+	$comment=$comment1;
+}
+	
+  ?>
+   <textarea class="comment" id="comment" name="comment[]" onChange="makeUppercase(this)" cols="30" rows="1" style="background-color: silver;">
+<?php echo htmlspecialchars($comment);?></textarea>
+  </td>
+
+  
+  </tr>
+ 
+<input type="hidden" name="id_check[]" id="id_check" maxlength="3" readonly="readonly"
+value="<?php echo htmlspecialchars(htmlentities($id_check.','.'gen'));?>"  size="2"/>
+
+<input type="hidden" name="filing_no" id="draft_filing_no" value="<?php echo htmlspecialchars(htmlentities($filing_no));?>"/>  
+<input type="hidden" name="scrutiny_level_value" id="scrutiny_level_value" value="0"/> 
+<input type="hidden" name="ref_no_ia" value="<?php echo htmlspecialchars(htmlentities($ref_no_ia));?>"/>
+<input type="hidden" name="ia_id" value="<?php echo htmlspecialchars(htmlentities($ia_id));?>"/> 
+<input type="hidden" name="user_id" id="user_id" value="<?php echo htmlspecialchars(htmlentities($userid));?>"/> 
+<input type="hidden" name="c_case" id="c_case" value="<?php echo htmlspecialchars(htmlentities($c_case));?>"/> 
+<input type="hidden" name="miscellaneous_ref_no_post" id="miscellaneous_ref_no_post" value="<?php echo htmlspecialchars(htmlentities($miscellaneous_ref_no_post));?>"/>
+<input type="hidden" name="report_party_type" id="report_party_type" value="<?php echo htmlspecialchars(htmlentities($report_party_type));?>"/>
+<input type="hidden" name="subdoctype" id="subdoctype" value="<?php echo htmlspecialchars(htmlentities($subdoctype));?>"/>
+ 
+ 
+ <?php
+$j++;
+$i++;
+}
+
+?>
+ 
+ </td></tr>
+
+    </table>
+   
+  </div></div>
+  <table>
+  <tr><td>
+  <?php 
+ 
+  if($c_case==1 || $c_case==4 || $c_case==5)
+  {
+	  
+ 		$st2=$dbonline->prepare("select * from e_case_detail_fees where filing_no=? ");
+			$st2->bindParam(1, $tokenno, PDO::PARAM_STR);
+			$st2->execute();
+			$i=0;
+			while ($row2= $st2->fetch(PDO::FETCH_ASSOC,PDO::FETCH_ORI_NEXT))
+			{
+				 $E_sec_id=$row2['sec_id'];
+				$E_act_id=$row2['act_id'];
+				$inter_act_id=$row2['inter_act_id'];
+				
+						
+		?>
+		<input type="hidden" name='found_all[]' value='<?php echo $E_sec_id;?>' />
+		<?php 		
+			}
+	?>
+	 </td></tr>
+					
+
+    </table>
+	<?php 
+ // $case_type;
+        // $E_sec_id;
+	
+	if($E_sec_id =='33'){$E_sec_id='32';}
+				if($E_sec_id =='31'){$E_sec_id='32';}
+				
+				
+ if($E_sec_id=='34' OR $E_sec_id=='35' OR $E_sec_id=='36' OR $case_type=='14' OR $case_type=='15' ) 
+ {
+ 
+ 
+ 	    
+  ?>
+  
+  <div class="accordion-section">
+				<a class="accordion-section-title" href="#accordion-2" id="draft_id"><?php if($case_type!=15 && $case_type!=14){echo htmlspecialchars($act_name_all);} else if($case_type==15){echo 'Second Motion';}
+				else if($case_type==14){echo 'First Motion';}?></a>
+				<div id="accordion-2" class="accordion-section-content">
+					
+			 <table border="1" >	
+	 <tr><td colspan="12"></td></tr>
+  <tr style="background-color:#6D6968 ;text-align: center; color: #FFFFFF;">
+  <td width="3%">Sr. No</td><td width="67%">Description</td><td width="6%">Defect Free</td><td width="16%">Comments</td>
+  </tr>
+ <tr><td colspan="12">
+ 
+    <?php
+    //$status=$_REQUEST['status'];
+
+ ?>
+
+ <?php 
+ 
+  
+  $display='TRUE';
+
+  //find to open scrutiny master local
+/*   if($E_sec_id =='15' OR $E_sec_id =='14')
+  {$act_id_all='1';}
+  else 
+  {
+  	$act_id_all=$E_sec_id;
+  } */
+  
+ /*
+if($case_type =='2' OR $case_type =='13')
+{
+$sth=$db->prepare("select * from master_scrutiny_local where  link_id=? and case_type=?  order by id_serno ASC ");
+$sth->bindParam(1, $location_access, PDO::PARAM_STR);
+$sth->bindParam(2, $E_sec_id, PDO::PARAM_STR);
+$sth->bindParam(3, $case_type, PDO::PARAM_STR);
+$sth->execute();    
+}
+else       
+{*/
+
+if($case_type!='15' || $case_type!='14')
+{
+
+$sth=$db->prepare("select * from master_scrutiny_local where  link_id=?  order by id_serno ASC ");
+//$sth->bindParam(1, $location_access, PDO::PARAM_STR);
+$sth->bindParam(1, $E_sec_id, PDO::PARAM_STR);
+$sth->execute();
+}
+if($case_type=='15' || $case_type=='14')
+{
+$sth=$db->prepare("select * from master_scrutiny_local where  case_type=?  order by id_serno ASC ");
+//$sth->bindParam(1, $location_access, PDO::PARAM_STR);
+$sth->bindParam(1, $case_type, PDO::PARAM_STR);
+$sth->execute();
+}
+
+
+//}
+$i=0;
+$j=1;
+while ($rowa = $sth->fetch(PDO::FETCH_ASSOC,PDO::FETCH_ORI_NEXT))
+{
+	  $id_check=$rowa['id_serno'];
+    $check_list=$rowa['name'];
+    $display_all=$rowa['display'];
+		$obj_sub_code=1;
+		$level_level=0;
+		
+ //check draft record exist or not
+ 
+ if($c_case!=4)
+	{
+		
+		//$frm_type='R';
+		//$frm_type1='O';
+ $check_record_exist = $db->prepare("select display from $schemas.draft_objection_details where filing_no=? and objection_code=? and objection_sub_code=? and user_id=? and level_level=? and form_type IS NULL");
+ $check_record_exist->bindParam(1, $filing_no, PDO::PARAM_STR);
+ $check_record_exist->bindParam(2, $id_check, PDO::PARAM_STR);
+ $check_record_exist->bindParam(3, $obj_sub_code, PDO::PARAM_STR);
+ $check_record_exist->bindParam(4, $userid, PDO::PARAM_STR);
+ $check_record_exist->bindParam(5, $level_level, PDO::PARAM_STR);
+  //$check_record_exist->bindParam(6, $frm_type, PDO::PARAM_STR);
+  // $check_record_exist->bindParam(7, $frm_type1, PDO::PARAM_STR);
+ $check_record_exist->execute();
+ $display_for_chk= $check_record_exist->fetchColumn();
+ if($display_for_chk){
+  $sql="select status,comment,scrutiny_correction from $schemas.draft_objection_details where filing_no='$filing_no' and objection_code='$id_check' and objection_sub_code='$obj_sub_code' and user_id='$userid' and level_level='$level_level' and form_type IS NULL";
+ }else{
+
+ $sql="select status,comments,scrutiny_correction from $schemas.objection_details where filing_no='$filing_no' and objection_code='$id_check' and objection_sub_code='$obj_sub_code' and form_type IS NULL";
+ }
+	}
+	
+	if($c_case==4)
+	{
+		//$form_type='R';
+	if($subdoctype =='17')
+				{
+					//$subdocname='Report';
+					$form_type='R';
+					
+				}
+				if($subdoctype =='33')
+				{
+					//$subdocname='Order';
+					$form_type='O';
+					
+				}	
+		
+    $check_record_exist = $db->prepare("select display from $schemas.draft_objection_details where filing_no=? and objection_code=? and objection_sub_code=? and user_id=? and level_level=? and miscellaneous_ref_no=? and form_type=?");
+          $check_record_exist->bindParam(1, $filing_no, PDO::PARAM_STR);
+					$check_record_exist->bindParam(2, $id_check, PDO::PARAM_STR);
+					$check_record_exist->bindParam(3, $obj_sub_code, PDO::PARAM_STR);
+					$check_record_exist->bindParam(4, $userid, PDO::PARAM_STR);
+					$check_record_exist->bindParam(5, $level_level, PDO::PARAM_STR);
+					$check_record_exist->bindParam(6, $miscellaneous_ref_no_post, PDO::PARAM_STR);
+					$check_record_exist->bindParam(7, $form_type, PDO::PARAM_STR);
+
+					$check_record_exist->execute();
+									
+					 $display_for_chk= $check_record_exist->fetchColumn();
+					if($display_for_chk){
+					 $sql="select status,comment,scrutiny_correction from $schemas.draft_objection_details where filing_no='$filing_no' and objection_code='$id_check' and objection_sub_code='$obj_sub_code'and user_id='$userid' and level_level='$level_level' and miscellaneous_ref_no='$miscellaneous_ref_no_post' and form_type='$form_type'";
+					}else{
+
+$sql="select status,comments,scrutiny_correction from $schemas.objection_details where filing_no='$filing_no' and objection_code='$id_check' and objection_sub_code='$obj_sub_code' and miscellaneous_ref_no='$miscellaneous_ref_no_post' and form_type='$form_type' ";
+					}
+					
+	}
+	 
+$stq=$db->prepare($sql);
+//$stq->bindParam(1, $filing_no, PDO::PARAM_INT);
+//$stq->bindParam(2, $id_check, PDO::PARAM_INT);
+$stq->execute();
+//$status = $stq->fetchColumn();
+while ($row_stq = $stq->fetch(PDO::FETCH_ASSOC,PDO::FETCH_ORI_NEXT))
+	 {  
+										$status = $row_stq['status'];  
+										$comment_other = $row_stq['comment'];
+										$cause_no = $row_stq['scrutiny_correction'];
+										$explode_cause_no = explode(',',$cause_no);
+	 }
+	 
+	
+?> 
+  <tr>
+ 
+  <td width="5%">
+ 
+  <?php echo htmlspecialchars($j);?>
+   
+  </td>
+
+  
+  <td width="60%" ><font color=" #1c2833 "><?php echo htmlspecialchars($check_list);?></font>
+  
+  
+ 
+  <td width="7%">
+
+ <?php 
+
+ //if($display_all  == '0')
+// {
+?>
+				 <select name="status" id="status" class="statuscheckother" onchange="myFunction()" style="
+    background-color: silver;
+    color: #000000;
+    padding: 7px 7px;
+    margin: 2px 0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;"   >
+	<option value="YES" <?php  if(trim($status)=='YES') echo "selected"; ?> >YES</option>
+	                <option value="NO" <?php  if(trim($status)=='NO') echo "selected"; ?> ><font color="red">NO</font></option>				 	
+ 				 	<option value="NA" <?php  if(trim($status)=='NA') echo "selected"; ?> >NA</option>
+ 				 	
+                 </select> 
+								 <input type="hidden" id="id_check_draft_other" value='<?php echo htmlspecialchars($id_check);?>' name="id_check_draft_other[]">   
+                 <?php 
+//}
+?>       
+  </td>
+  
+  <td width="20%">
+   <?php 
+ //if($display_all == '0')
+// {
+?>
+   <textarea class="comment_other" name="comment[]" onChange="makeUppercase(this)" cols="30" rows="1" style="background-color: silver;"><?php echo htmlspecialchars($comment_other);?></textarea>
+<?php
+// } 
+?>
+  </td>
+
+  
+  </tr>
+ 
+<input type="hidden" name="id_check[]" maxlength="3" readonly="readonly"
+value="<?php echo htmlspecialchars(htmlentities($id_check.",".'IBC1'));?>"  size="2"/>
+
+<input type="hidden" name="filing_no" value="<?php echo htmlspecialchars(htmlentities($filing_no));?>"/>  
+  
+ <?php
+$j++;
+$i++;
+}
+ }
+?>
+ 
+			
+	
+<?php 
+ }
+			
+//aaa
+?>				
+	   </table>
+<table>
+	   
+	  <tr>
+	  <div class="rr">
+<td   class="rr"><font face="Verdana" size="2" color="red">*</span> </font><font face="Verdana, Arial, Helvetica, sans-serif" size="4" color="red">Error in 
+</td>
+<td> 
+<select  style="display:none;width: 502px;
+    height: 152px;" class="rr" name="cause_no[]" id="cause_no" style="width: 620px; height: 200px" onFocus="SetBg(this)" onBlur="UnSetBg(this)" multiple>
+<?php
+
+if($c_case==2)
+{
+	
+	$st1=$dbonline->prepare("select * from scrutiny_status where id='6'");
+}
+else
+{
+	$st1=$dbonline->prepare("select * from scrutiny_status");
+}
+	
+	$st1->execute();
+	while ($row = $st1->fetch(PDO::FETCH_ASSOC,PDO::FETCH_ORI_NEXT))
+	{
+		
+	     $e_name=$row['cause_name'];
+		 $cause_no=$row['cause_no'];
+		?>
+
+	<option value="<?php echo $cause_no;?>" 
+	<?php 
+	if(in_array($cause_no,$explode_cause_no))
+	{  
+		print "selected"; 
+	} 
+	?>>
+	<?php echo strtoupper($e_name);?></option>
+	<?php
+ }
+ ?>
+
+</select>
+</td>
+
+
+<td class="rr">
+
+<font color="red" size="4">For Multiple Error Select (ctrl+left mouse click)</font></b>
+</td>
+</div>
+</tr>
+<tr>
+
+
+<td>
+Notification Date: <input id="in_notification_date" type="text" name="notification_date" readonly="readonly"
+value="<?php echo htmlspecialchars(htmlentities($cur_date1));?>" size="10" maxlength="10" /> 
+</td>
+<td>
+<input type="checkbox" value="0" id="agree" name="agree" required="required"> 
+<b><font color="red">Scrutiny Completed</font></b>
+</td>
+</tr>
+<div class="rr">
+
+</div>
+ </table>
+				
+				
+	<table width="70%" align="center">
+
+
+<td style="display: block;padding-top: 6px;" colspan="4" id="befornotification1"></td>
+<td style="display: block; "  id="befornotification">
+
+
+	<select id="in_searchby" name="searchby" style="display: block">
+	    	  
+	    		<option value="1">DEFECT FREE</option>
+	    		<option value="2">DEFECTIVE</option>	
+	   
+	           
+	   </select>
+	 </td>
+	<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
+	 <td> 	<input id="submit_final" type="submit" name="submit_final"
+ class="submit" value="UPDATE SCRUTINY" style="
+  background-color: green;
+    color: #FFFFFF;
+    padding: 5px 5px;
+    margin: 16px 15;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;	
+	" onClick="return defect_submit();"/>
+
+ </td>
+	 <td> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<input id="save_draft" type="button" name="save_draft"
+ class="submit" value="SAVE AS DRAFT" style="
+  background-color: green;
+    color: #FFFFFF;
+    padding: 5px 5px;
+    margin: 16px 15;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;	
+	" onClick="return draft_checklist();"/>
+
+ </td></tr>
+         </table>  			
+					
+          <?php } ?>     
+
+       
+                     
+      </form> 
+        
+        <!-- /.box-footer-->
+      </div>
+      </div>
+      <!-- /.box -->
+<div class="alert alert-success" style="display: none;">
+
+  <div class="demo-box" id="ajaxButton"></div>
+
+</div>
+    </section>
+    <!-- /.content -->
+  </div>
+   <script >
+ function OpenDMSForm(url,val1,val2,val3,val4,val5,val6,val7,val8,val9,val10)
+
+ {
+
+document.getElementById("frm").action=url;
+document.getElementById("itemno1").value=val1;
+document.getElementById("applno1").value=val2;
+document.getElementById("courtno1").value=val3;
+document.getElementById("caseno1").value=val4;
+document.getElementById("casetype1").value=val5;
+document.getElementById("partyname1").value=val6;
+document.getElementById("title1").value=val7;
+document.getElementById("status1").value=val8;
+document.getElementById("j_key1").value=val9;
+document.getElementById("j_securityKey1").value=val10;
+document.getElementById("frm").submit();
+
+ }
+ </script>
+ <form action="" method="POST" target="_blank" id="frm">
+    <input type="hidden" id="itemno1" name="itemno"  value=""/>
+    <input type="hidden" id="applno1" name="applno" value=""/>
+    <input type="hidden" id="courtno1" name="courtno" value=""/>
+    <input type="hidden" id="caseno1" name="caseno" value="" />
+    <input type="hidden" id="casetype1" name="casetype" value=""/>
+    <input type="hidden" id="partyname1" name="partyname" value="">
+    <input type="hidden" id="title1"name="title" value="">
+    <input type="hidden" id="status1" name="status" value="">	
+    <input type="hidden" id="j_key1"name="j_key" value=""> 
+    <input type="hidden" id="j_securityKey1" name="j_securityKey" value="">
+   
+</form>
+  <!-- /.content-wrapper -->
+  
+  
+  <?php 
+  include '../infooter.php';
+  ?>
+
+  <?php } ?>

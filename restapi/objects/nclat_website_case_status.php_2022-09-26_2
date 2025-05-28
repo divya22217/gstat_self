@@ -1,0 +1,781 @@
+<?php
+class NclatWebsiteCaseStatus{
+  
+    // database connection and table name
+    private $conn;
+	private $connonline;
+	private $filing_no_length;
+	private $backlog;
+	private $wrong_status;
+	private $blank;
+	private $pet_party_flag;
+	private $res_party_flag;
+	private $party_serial_no;
+  
+    // object properties
+    public $filing_no;
+    public $status;
+    public $pet_name;
+    public $res_name;
+    public $ia_ma_filing_no;
+    public $has_keyword;
+    public $group_scrutiny;
+	public $case_no;
+	public $case_type;
+	public $case_year;
+  
+    // constructor with $db as database connection
+    public function __construct($db,$filing_no_length,$backlog,$wrong_status,$blank,$pet_party_flag,$res_party_flag,$party_serial_no){
+        $this->conn = $db;
+		$this->filing_no_length = $filing_no_length;
+		$this->backlog = $backlog;
+		$this->wrong_status = $wrong_status;
+		$this->blank = $blank;
+		$this->pet_party_flag = $pet_party_flag;
+		$this->res_party_flag = $res_party_flag;
+		$this->party_serial_no = $party_serial_no;
+    }
+	
+	public function get_cases_filing_no_wise($db,$schema,$filing_no){
+		$query = "select temp1.filing_no,temp1.case_no,temp1.case_type,temp1.case_year,(coalesce(ecp1.name,'')|| ' VS ' ||coalesce(ecp2.name,'')) as case_title,
+					temp1.date_of_registration, temp1.status from  (select 
+					a.filing_no,cast(a.case_no as int) as case_no ,a.case_year,b.short_name as case_type,
+					case when (length(a.main_case_ia_no) = ?) then a.main_case_ia_no else a.filing_no end as party_filing_no,
+					case when (a.backlog = ?) then a.regis_date else null end as date_of_registration,a.status,a.main_case_ia_no
+					from $schema.case_detail as a join case_type as b ON b.id = a.case_type 
+					where a.filing_no = ? and a.case_no != ? and a.status != ?
+					order by a.case_year asc, case_no asc, a.regis_date desc
+					) as temp1 
+					left join e_cases_party as ecp1 on ecp1.filing_no = temp1.party_filing_no and ecp1.party_flag = ? and ecp1.party_serial_no = ?
+					left join e_cases_party as ecp2 on ecp2.filing_no = temp1.party_filing_no and ecp2.party_flag = ? and ecp2.party_serial_no = ?";
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $this->filing_no_length, PDO::PARAM_STR);
+		$stmt->bindParam(2, $this->backlog, PDO::PARAM_STR);
+		$stmt->bindParam(3, $filing_no, PDO::PARAM_STR);
+		$stmt->bindParam(4, $this->blank, PDO::PARAM_STR);
+		$stmt->bindParam(5, $this->wrong_status, PDO::PARAM_STR);
+		$stmt->bindParam(6, $this->pet_party_flag, PDO::PARAM_STR);
+		$stmt->bindParam(7, $this->party_serial_no, PDO::PARAM_STR);
+		$stmt->bindParam(8, $this->res_party_flag, PDO::PARAM_STR);
+		$stmt->bindParam(9, $this->party_serial_no, PDO::PARAM_STR);
+		$stmt->execute();
+		$case_info = $stmt->fetchAll();
+		return $case_info;
+	}
+	
+	public function get_cases_case_no_wise($db,$schema,$case_type,$case_no,$case_year){
+		$where = '';
+		if ($case_year != 'All') {
+			$where = "and a.case_year = ? ";
+		}
+		$query = "select temp1.filing_no,temp1.case_no,temp1.case_type,temp1.case_year,(coalesce(ecp1.name,'')|| ' VS ' ||coalesce(ecp2.name,'')) as case_title,
+					temp1.date_of_registration, temp1.status from  (select 
+					a.filing_no,cast(a.case_no as int) as case_no ,a.case_year,b.short_name as case_type,
+					case when (length(a.main_case_ia_no) = ?) then a.main_case_ia_no else a.filing_no end as party_filing_no,
+					case when (a.backlog = ?) then a.regis_date else null end as date_of_registration,a.status,a.main_case_ia_no
+					from $schema.case_detail as a join case_type as b ON b.id = a.case_type 
+					where a.case_type = ? and a.case_no = ? $where and a.case_no != ? and a.status != ?
+					order by a.case_year asc, case_no asc, a.regis_date desc
+					) as temp1 
+					left join e_cases_party as ecp1 on ecp1.filing_no = temp1.party_filing_no and ecp1.party_flag = ? and ecp1.party_serial_no = ?
+					left join e_cases_party as ecp2 on ecp2.filing_no = temp1.party_filing_no and ecp2.party_flag = ? and ecp2.party_serial_no = ?";
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $this->filing_no_length, PDO::PARAM_STR);
+		$stmt->bindParam(2, $this->backlog, PDO::PARAM_STR);
+		$stmt->bindParam(3, $case_type, PDO::PARAM_STR);
+		$stmt->bindParam(4, $case_no, PDO::PARAM_STR);
+		$srn = 5;
+		if ($case_year != 'All') {
+			$stmt->bindParam(5, $case_year, PDO::PARAM_STR);
+			$srn = 6;
+		}
+		$stmt->bindParam($srn, $this->blank, PDO::PARAM_STR); $srn++;
+		$stmt->bindParam($srn, $this->wrong_status, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam($srn, $this->pet_party_flag, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam($srn, $this->party_serial_no, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam($srn, $this->res_party_flag, PDO::PARAM_STR);   $srn++;
+		$stmt->bindParam($srn, $this->party_serial_no, PDO::PARAM_STR);
+		$stmt->execute();
+		$case_info = $stmt->fetchAll();
+		return $case_info;
+	}
+	
+	public function get_cases_case_type_wise($db,$schema,$case_type,$case_year,$case_status){
+		$where = $where_status = '';
+		if ($case_year != 'All') {
+			$where = "and a.case_year = ? ";
+		}
+		if ($case_status != 'all') {
+			$where_status = "and a.status = ? ";
+		}
+		$query = "select temp1.filing_no,temp1.case_no,temp1.case_type,temp1.case_year,(coalesce(ecp1.name,'')|| ' VS ' ||coalesce(ecp2.name,'')) as case_title,
+					temp1.date_of_registration, temp1.status from  (select 
+					a.filing_no,cast(a.case_no as int) as case_no ,a.case_year,b.short_name as case_type,
+					case when (length(a.main_case_ia_no) = ?) then a.main_case_ia_no else a.filing_no end as party_filing_no,
+					case when (a.backlog = ?) then a.regis_date else null end as date_of_registration,a.status,a.main_case_ia_no
+					from $schema.case_detail as a join case_type as b ON b.id = a.case_type 
+					where a.case_type = ? $where $where_status and a.case_no != ? and a.status != ?
+					order by a.case_year asc, case_no asc, a.regis_date desc
+					) as temp1 
+					left join e_cases_party as ecp1 on ecp1.filing_no = temp1.party_filing_no and ecp1.party_flag = ? and ecp1.party_serial_no = ?
+					left join e_cases_party as ecp2 on ecp2.filing_no = temp1.party_filing_no and ecp2.party_flag = ? and ecp2.party_serial_no = ?";
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $this->filing_no_length, PDO::PARAM_STR);
+		$stmt->bindParam(2, $this->backlog, PDO::PARAM_STR);
+		$stmt->bindParam(3, $case_type, PDO::PARAM_STR);
+		$srn = 4;
+		if ($case_year != 'All') {
+			$stmt->bindParam($srn, $case_year, PDO::PARAM_STR);
+			$srn++;
+		}
+		if ($case_status != 'all') {
+			$stmt->bindParam($srn, $case_status, PDO::PARAM_STR);
+			$srn++;
+		}
+		$stmt->bindParam($srn, $this->blank, PDO::PARAM_STR); $srn++;
+		$stmt->bindParam($srn, $this->wrong_status, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam($srn, $this->pet_party_flag, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam($srn, $this->party_serial_no, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam($srn, $this->res_party_flag, PDO::PARAM_STR);   $srn++;
+		$stmt->bindParam($srn, $this->party_serial_no, PDO::PARAM_STR);
+		$stmt->execute();
+		$case_info = $stmt->fetchAll();
+		return $case_info;
+	}
+
+	public function get_cases_main_party_wise($db,$schema,$party_type,$party_name,$case_year){
+		$where = '';
+		if ($case_year != 'All') {
+			$where = "and a.case_year = ? ";
+		}
+		$query = "select temp1.filing_no,temp1.case_no,temp1.case_type,temp1.case_year,(coalesce(ecp1.name,'')|| ' VS ' ||coalesce(ecp2.name,'')) as case_title,
+					temp1.date_of_registration, temp1.status from  (select 
+					a.filing_no,cast(a.case_no as int) as case_no ,a.case_year,b.short_name as case_type,
+					case when (length(a.main_case_ia_no) = ?) then a.main_case_ia_no else a.filing_no end as party_filing_no,
+					case when (a.backlog = ?) then a.regis_date else null end as date_of_registration,a.status,a.main_case_ia_no
+					from $schema.case_detail as a join case_type as b ON b.id = a.case_type 
+					where (lower(a.pet_name) like '%$party_name%' or lower(a.res_name) like '%$party_name%')
+					 $where and a.case_no != ? and a.status != ?
+					order by a.case_year asc, case_no asc, a.regis_date desc
+					) as temp1 
+					left join e_cases_party as ecp1 on ecp1.filing_no = temp1.party_filing_no and ecp1.party_flag = ? and ecp1.party_serial_no = ?
+					left join e_cases_party as ecp2 on ecp2.filing_no = temp1.party_filing_no and ecp2.party_flag = ? and ecp2.party_serial_no = ?";
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $this->filing_no_length, PDO::PARAM_STR);
+		$stmt->bindParam(2, $this->backlog, PDO::PARAM_STR);
+		$srn = 3;
+		if ($case_year != 'All') {
+			$stmt->bindParam(3, $case_year, PDO::PARAM_STR);
+			$srn = 4;
+		}
+		$stmt->bindParam($srn, $this->blank, PDO::PARAM_STR); $srn++;
+		$stmt->bindParam($srn, $this->wrong_status, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam($srn, $this->pet_party_flag, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam($srn, $this->party_serial_no, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam($srn, $this->res_party_flag, PDO::PARAM_STR);   $srn++;
+		$stmt->bindParam($srn, $this->party_serial_no, PDO::PARAM_STR);
+		$stmt->execute();
+		$case_info = $stmt->fetchAll();
+		return $case_info;
+	}
+
+	public function get_cases_additional_party_wise($db,$schema,$filing_noss){
+		
+		$query = "select temp1.filing_no,temp1.case_no,temp1.case_type,temp1.case_year,(coalesce(ecp1.name,'')|| ' VS ' ||coalesce(ecp2.name,'')) as case_title,
+					temp1.date_of_registration, temp1.status from  (select 
+					a.filing_no,cast(a.case_no as int) as case_no ,a.case_year,b.short_name as case_type,
+					case when (length(a.main_case_ia_no) = ?) then a.main_case_ia_no else a.filing_no end as party_filing_no,
+					case when (a.backlog = ?) then a.regis_date else null end as date_of_registration,a.status,a.main_case_ia_no
+					from $schema.case_detail as a join case_type as b ON b.id = a.case_type 
+					where a.filing_no  $filing_noss and a.case_no != ? and a.status != ?
+					order by a.case_year asc, case_no asc, a.regis_date desc
+					) as temp1 
+					left join e_cases_party as ecp1 on ecp1.filing_no = temp1.party_filing_no and ecp1.party_flag = ? and ecp1.party_serial_no = ?
+					left join e_cases_party as ecp2 on ecp2.filing_no = temp1.party_filing_no and ecp2.party_flag = ? and ecp2.party_serial_no = ?";
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $this->filing_no_length, PDO::PARAM_STR);
+		$stmt->bindParam(2, $this->backlog, PDO::PARAM_STR);
+		$stmt->bindParam(3, $this->blank, PDO::PARAM_STR); 
+		$stmt->bindParam(4, $this->wrong_status, PDO::PARAM_STR);  
+		$stmt->bindParam(5, $this->pet_party_flag, PDO::PARAM_STR);  
+		$stmt->bindParam(6, $this->party_serial_no, PDO::PARAM_STR);  
+		$stmt->bindParam(7, $this->res_party_flag, PDO::PARAM_STR);  
+		$stmt->bindParam(8, $this->party_serial_no, PDO::PARAM_STR);
+		$stmt->execute();
+		$case_info = $stmt->fetchAll();
+		return $case_info;
+	}
+
+	public function get_cases_advocated_wise($db,$schema,$filing_noss){
+		
+		$query = "select temp1.filing_no,temp1.case_no,temp1.case_type,temp1.case_year,(coalesce(ecp1.name,'')|| ' VS ' ||coalesce(ecp2.name,'')) as case_title,
+					temp1.date_of_registration, temp1.status from  (select 
+					a.filing_no,cast(a.case_no as int) as case_no ,a.case_year,b.short_name as case_type,
+					case when (length(a.main_case_ia_no) = ?) then a.main_case_ia_no else a.filing_no end as party_filing_no,
+					case when (a.backlog = ?) then a.regis_date else null end as date_of_registration,a.status,a.main_case_ia_no
+					from $schema.case_detail as a join case_type as b ON b.id = a.case_type 
+					where a.filing_no  $filing_noss and a.case_no != ? and a.status != ?
+					order by a.case_year asc, case_no asc, a.regis_date desc
+					) as temp1 
+					left join e_cases_party as ecp1 on ecp1.filing_no = temp1.party_filing_no and ecp1.party_flag = ? and ecp1.party_serial_no = ?
+					left join e_cases_party as ecp2 on ecp2.filing_no = temp1.party_filing_no and ecp2.party_flag = ? and ecp2.party_serial_no = ?";
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $this->filing_no_length, PDO::PARAM_STR);
+		$stmt->bindParam(2, $this->backlog, PDO::PARAM_STR);
+		$stmt->bindParam(3, $this->blank, PDO::PARAM_STR); 
+		$stmt->bindParam(4, $this->wrong_status, PDO::PARAM_STR);  
+		$stmt->bindParam(5, $this->pet_party_flag, PDO::PARAM_STR);  
+		$stmt->bindParam(6, $this->party_serial_no, PDO::PARAM_STR);  
+		$stmt->bindParam(7, $this->res_party_flag, PDO::PARAM_STR);  
+		$stmt->bindParam(8, $this->party_serial_no, PDO::PARAM_STR);
+		$stmt->execute();
+		$case_info = $stmt->fetchAll();
+		return $case_info;
+	}
+
+	public function get_orders_judgements_judge_wise($db,$schema,$page,$case_type,$judge_code,$category,$from_date,$to_date,$search_by_option){
+		$case_type_where = '';
+		if($case_type != 'All') {
+			$case_type_where = " and cd.case_type = ? ";
+		}
+		$category_where = '';
+		if($category != 'All') {
+			$category_where = " and cd.status = ? ";
+		}
+		if($page == 'orders'){
+			$order_query = " and (od.order_type = ? or od.order_type = ?)";
+			$order_type = 'D';
+			$order_type_2 = 'DC';
+		}else if($page == 'judgements'){
+			$order_query = " and (od.order_type = ? or od.order_type = ?)";
+			$order_type = 'J';
+			$order_type_2 = 'JC';
+		}else if($page == 'judgements_orders'){
+			$order_query = "";
+		}else{
+			$order_query = " and (od.order_type = ? or od.order_type = ?)";
+			$order_type = '';
+			$order_type_2 = '';
+		}
+		$inner_query = '';
+		if($search_by_option == 'judges_member_wise'){
+			$inner_query = " and (string_to_array(od.judge_codes, ',') && Array['$judge_code'])";
+		}
+		$query = "select distinct(temp1.filing_no) as filing_no,temp1.case_no,temp1.case_type,temp1.case_year,temp1.status,
+		(coalesce(ecp1.name,'')|| ' VS ' ||coalesce(ecp2.name,'')) as case_title,
+		temp1.main_case_ia_no,temp1.bench
+		from (select distinct(od.filing_no) as filing_no,cd.case_no,cd.case_year,cd.status,
+		cd.location_code,ct.short_name as case_type,mlc.city_name as bench,
+		case when (length(cd.main_case_ia_no) = ?) then cd.main_case_ia_no else cd.filing_no end as party_filing_no,cd.main_case_ia_no
+		from $schema.order_daily as od 
+		left join $schema.case_detail as cd on cd.filing_no = od.filing_no
+		left join case_type as ct on ct.id = cd.case_type
+		left join mater_location_city as mlc on mlc.city_id = cd.location_code
+		where (od.order_date between ? and ?) 
+		$inner_query $case_type_where  and cd.status != ? $category_where
+		$order_query) as temp1
+		left join e_cases_party as ecp1 on ecp1.filing_no = temp1.party_filing_no and ecp1.party_flag = ? and ecp1.party_serial_no = ?
+		left join e_cases_party as ecp2 on ecp2.filing_no = temp1.party_filing_no and ecp2.party_flag = ? and ecp2.party_serial_no = ?";
+		
+
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $this->filing_no_length, PDO::PARAM_STR);
+		$stmt->bindParam(2, $from_date, PDO::PARAM_STR);
+		$stmt->bindParam(3, $to_date, PDO::PARAM_STR);
+		$srn = 4;
+		if($case_type != 'All') {
+			$stmt->bindParam($srn, $case_type, PDO::PARAM_STR);
+			$srn++;
+		} 
+		$stmt->bindParam($srn, $this->wrong_status, PDO::PARAM_STR);  $srn++;
+		if($category != 'All') {
+			$stmt->bindParam($srn, $category, PDO::PARAM_STR);
+			$srn++;
+		}
+		if($page != 'judgements_orders'){		
+			$stmt->bindParam($srn, $order_type, PDO::PARAM_STR);  $srn++;
+			$stmt->bindParam($srn, $order_type_2, PDO::PARAM_STR);  $srn++;
+		}
+		$stmt->bindParam($srn, $this->pet_party_flag, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam($srn, $this->party_serial_no, PDO::PARAM_STR); $srn++;
+		$stmt->bindParam($srn, $this->res_party_flag, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam($srn, $this->party_serial_no, PDO::PARAM_STR);
+		$stmt->execute();
+		$case_info = $stmt->fetchAll();
+		return $case_info;
+	}
+
+
+
+	public function get_orders_judgements_case_no_wise($db,$schema,$page,$case_type,$case_no,$case_year){
+		$case_year_where = '';
+		if($case_year != 'All') {
+			$case_year_where = " and cd.case_year = ? ";
+		}
+		if($page == 'orders'){
+			$order_query = " and (od.order_type = ? or od.order_type = ?)";
+			$order_type = 'D';
+			$order_type_2 = 'DC';
+		}else if($page == 'judgements'){
+			$order_query = " and (od.order_type = ? or od.order_type = ?)";
+			$order_type = 'J';
+			$order_type_2 = 'JC';
+		}else if($page == 'judgements_orders'){
+			$order_query = "";
+		}else{
+			$order_query = " and (od.order_type = ? or od.order_type = ?)";
+			$order_type = '';
+			$order_type_2 = '';
+		}
+		
+		$query = "select temp1.filing_no,temp1.case_no,temp1.case_type,temp1.case_year,temp1.status,
+		(coalesce(ecp1.name,'')|| ' VS ' ||coalesce(ecp2.name,'')) as case_title,
+		temp1.main_case_ia_no,temp1.bench
+		from (select distinct(od.filing_no) as filing_no,cd.case_no,cd.case_year,cd.status,
+		cd.location_code,ct.short_name as case_type,mlc.city_name as bench,
+		case when (length(cd.main_case_ia_no) = ?) then cd.main_case_ia_no else cd.filing_no end as party_filing_no,cd.main_case_ia_no
+		from $schema.order_daily as od 
+		left join $schema.case_detail as cd on cd.filing_no = od.filing_no
+		left join case_type as ct on ct.id = cd.case_type
+		left join mater_location_city as mlc on mlc.city_id = cd.location_code
+		where cd.case_no = ? and cd.case_type = ? $case_year_where and cd.status != ?
+		$order_query) as temp1
+		left join e_cases_party as ecp1 on ecp1.filing_no = temp1.party_filing_no and ecp1.party_flag = ? and ecp1.party_serial_no = ?
+		left join e_cases_party as ecp2 on ecp2.filing_no = temp1.party_filing_no and ecp2.party_flag = ? and ecp2.party_serial_no = ?";
+		
+		
+		
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $this->filing_no_length, PDO::PARAM_STR);
+		$stmt->bindParam(2, $case_no, PDO::PARAM_STR);
+		$stmt->bindParam(3, $case_type, PDO::PARAM_STR);
+		$srn = 4;
+		if($case_year != 'All') {
+			$stmt->bindParam($srn, $case_year, PDO::PARAM_STR);
+			$srn++;
+		} 
+
+		$stmt->bindParam($srn, $this->wrong_status, PDO::PARAM_STR);  $srn++;
+		if($page != 'judgements_orders')	{
+			$stmt->bindParam($srn, $order_type, PDO::PARAM_STR);  $srn++;
+			$stmt->bindParam($srn, $order_type_2, PDO::PARAM_STR);  $srn++;
+		}
+		$stmt->bindParam($srn, $this->pet_party_flag, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam($srn, $this->party_serial_no, PDO::PARAM_STR); $srn++;
+		$stmt->bindParam($srn, $this->res_party_flag, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam($srn, $this->party_serial_no, PDO::PARAM_STR);
+		$stmt->execute();
+		$case_info = $stmt->fetchAll();
+		return $case_info;
+	}
+
+	public function get_orders_judgements_efiling_no_wise($db,$schema,$page,$filing_no){
+		if($page == 'orders'){
+			$order_query = " and (od.order_type = ? or od.order_type = ?)";
+			$order_type = 'D';
+			$order_type_2 = 'DC';
+		}else if($page == 'judgements'){
+			$order_query = " and (od.order_type = ? or od.order_type = ?)";
+			$order_type = 'J';
+			$order_type_2 = 'JC';
+		}else if($page == 'judgements_orders'){
+			$order_query = "";
+		}else{
+			$order_query = " and (od.order_type = ? or od.order_type = ?)";
+			$order_type = '';
+			$order_type_2 = '';
+		}
+		$query = "select temp1.filing_no,temp1.case_no,temp1.case_type,temp1.case_year,temp1.status,
+		(coalesce(ecp1.name,'')|| ' VS ' ||coalesce(ecp2.name,'')) as case_title,
+		temp1.main_case_ia_no,temp1.bench
+		from (select distinct(od.filing_no) as filing_no,cd.case_no,cd.case_year,cd.status,
+		cd.location_code,ct.short_name as case_type,mlc.city_name as bench,
+		case when (length(cd.main_case_ia_no) = ?) then cd.main_case_ia_no else cd.filing_no end as party_filing_no,cd.main_case_ia_no
+		from $schema.order_daily as od 
+		left join $schema.case_detail as cd on cd.filing_no = od.filing_no
+		left join case_type as ct on ct.id = cd.case_type
+		left join mater_location_city as mlc on mlc.city_id = cd.location_code
+		left join $schema.master_judge as mj on mj.judge_code = od.author_by
+		where cd.filing_no = ? and cd.status != ?
+		$order_query ) as temp1
+		left join e_cases_party as ecp1 on ecp1.filing_no = temp1.party_filing_no and ecp1.party_flag = ? and ecp1.party_serial_no = ?
+		left join e_cases_party as ecp2 on ecp2.filing_no = temp1.party_filing_no and ecp2.party_flag = ? and ecp2.party_serial_no = ?";
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $this->filing_no_length, PDO::PARAM_STR);
+		$stmt->bindParam(2, $filing_no, PDO::PARAM_STR);
+		$stmt->bindParam(3, $this->wrong_status, PDO::PARAM_STR); 
+		$srn = 4;		
+		if($page != 'judgements_orders')		{
+			$stmt->bindParam($srn, $order_type, PDO::PARAM_STR);  $srn++;
+			$stmt->bindParam($srn, $order_type_2, PDO::PARAM_STR);  $srn++;
+		}  
+		$stmt->bindParam($srn, $this->pet_party_flag, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam($srn, $this->party_serial_no, PDO::PARAM_STR); $srn++;
+		$stmt->bindParam($srn, $this->res_party_flag, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam($srn, $this->party_serial_no, PDO::PARAM_STR);	$srn++;
+		$stmt->execute();
+		$case_info = $stmt->fetchAll();
+		return $case_info;
+	}
+
+	public function get_orders_judgements_freetext_wise($db,$schema,$page,$data_search){
+		if($page == 'orders'){
+			$order_query = " and (od.order_type = ? or od.order_type = ?)";
+			$order_type = 'D';
+			$order_type_2 = 'DC';
+		}else if($page == 'judgements'){
+			$order_query = " and (od.order_type = ? or od.order_type = ?)";
+			$order_type = 'J';
+			$order_type_2 = 'JC';
+		}else if($page == 'judgements_orders'){
+			$order_query = "";
+		}else{
+			$order_query = " and (od.order_type = ? or od.order_type = ?)";
+			$order_type = '';
+			$order_type_2 = '';
+		}
+		$query = "select temp1.filing_no,temp1.case_no,temp1.case_type,temp1.case_year,temp1.status,
+		(coalesce(ecp1.name,'')|| ' VS ' ||coalesce(ecp2.name,'')) as case_title,
+		temp1.main_case_ia_no,temp1.bench
+		from (select distinct(od.filing_no) as filing_no,cd.case_no,cd.case_year,cd.status,
+		cd.location_code,ct.short_name as case_type,mlc.city_name as bench,
+		case when (length(cd.main_case_ia_no) = ?) then cd.main_case_ia_no else cd.filing_no end as party_filing_no,cd.main_case_ia_no
+		from $schema.order_daily as od 
+		left join $schema.case_detail as cd on cd.filing_no = od.filing_no
+		left join case_type as ct on ct.id = cd.case_type
+		left join mater_location_city as mlc on mlc.city_id = cd.location_code
+		left join $schema.master_judge as mj on mj.judge_code = od.author_by
+		where $data_search and cd.status != ?
+		$order_query) as temp1
+		left join e_cases_party as ecp1 on ecp1.filing_no = temp1.party_filing_no and ecp1.party_flag = ? and ecp1.party_serial_no = ?
+		left join e_cases_party as ecp2 on ecp2.filing_no = temp1.party_filing_no and ecp2.party_flag = ? and ecp2.party_serial_no = ?";
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $this->filing_no_length, PDO::PARAM_STR);
+		$stmt->bindParam(2, $this->wrong_status, PDO::PARAM_STR);  
+		$srn = 3;
+		if($page != 'judgements_orders')	{	
+			$stmt->bindParam($srn, $order_type, PDO::PARAM_STR);  $srn++;
+			$stmt->bindParam($srn, $order_type_2, PDO::PARAM_STR);  $srn++;
+		}  
+		$stmt->bindParam(5, $this->pet_party_flag, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam(6, $this->party_serial_no, PDO::PARAM_STR); $srn++;
+		$stmt->bindParam(7, $this->res_party_flag, PDO::PARAM_STR);  $srn++;
+		$stmt->bindParam(8, $this->party_serial_no, PDO::PARAM_STR);	$srn++;
+		$stmt->execute();
+		$case_info = $stmt->fetchAll();
+		return $case_info;
+	}
+	
+	public function get_orders_judgements($db,$schema,$page,$filing_no){
+		if($page == 'orders'){
+			$order_query = " and (od.order_type = ? or od.order_type = ?)";
+			$order_type = 'D';
+			$order_type_2 = 'DC';
+		}else if($page == 'judgements'){
+			$order_query = " and (od.order_type = ? or od.order_type = ?)";
+			$order_type = 'J';
+			$order_type_2 = 'JC';
+		}else if($page == 'judgements_orders'){
+			$order_query = "";
+		}else{
+			$order_query = " and (od.order_type = ? or od.order_type = ?)";
+			$order_type = '';
+			$order_type_2 = '';
+		}
+		$query = "select od.order_date as date_of_judgement_order,od.bench_no,od.pdf_path,mj.judge_name 
+					from $schema.order_daily as od
+					left join $schema.master_judge as mj on mj.judge_code = od.author_by
+					where od.filing_no = ? $order_query order by od.order_date desc";
+					
+		//echo $query;
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$srn = 2;
+		if($page != 'judgements_orders')		{
+			$stmt->bindParam($srn, $order_type, PDO::PARAM_STR);  $srn++;
+			$stmt->bindParam($srn, $order_type_2, PDO::PARAM_STR);  $srn++;
+		}
+		$stmt->execute();
+		$orders = $stmt->fetchAll();
+		return $orders;
+	}
+
+	public function get_case_details($db,$schema,$filing_no){
+		$query = "select cd.filing_no,cd.status,cd.case_no,cd.case_year,ct.short_name as case_type,cd.dt_of_filing as date_of_filing,cd.main_case_ia_no,
+					case when (cd.backlog = ?) then cd.regis_date else null end as registration_date
+					from $schema.case_detail cd	
+					left join case_type as ct on ct.id = cd.case_type
+					where cd.filing_no = ?";
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $this->backlog, PDO::PARAM_STR);
+		$stmt->bindParam(2, $filing_no, PDO::PARAM_STR);
+		$stmt->execute();
+		$case_info = $stmt->fetchAll();
+		return $case_info;
+
+	}
+
+	public function get_child_cases_details($db,$schema,$main_case_filing_no){
+		$query = "select cd.filing_no,cd.status,cd.case_no,cd.case_year,ct.short_name as case_type,cd.dt_of_filing as filing_date,
+					case when (cd.backlog = ?) then cd.regis_date else null end as registration_date
+					from $schema.case_detail as cd 
+					left join case_type as ct on ct.id = cd.case_type
+					where cd.main_case_ia_no = ?";
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $this->backlog, PDO::PARAM_STR);
+		$stmt->bindParam(2, $main_case_filing_no, PDO::PARAM_STR);
+		$stmt->execute();
+		$case_info = $stmt->fetchAll();
+		return $case_info;
+	}
+
+	public function get_connected_cases($db,$schema,$filing_no,$status = 'C',$display = true){
+		$na = 'NA';
+		$query = "select cs.conn_filing_no as filing_no,cd.dt_of_filing as filing_date,cd.case_no,cd.case_year,ct.short_name as case_type,
+				case when (cd.backlog = ?) then cd.regis_date else null end as registration_date,cd.status
+					   from $schema.connected_cases as cs
+					   left join $schema.case_detail as cd on cd.filing_no = cs.conn_filing_no
+					   left join case_type as ct on ct.id = cd.case_type
+					   where cs.filing_no = ? and cs.status = ? and cs.display = ? order by cd.filing_no asc";
+		   $stmt = $this->conn->prepare($query);
+		   $stmt->bindParam(1, $this->backlog, PDO::PARAM_STR);
+		   $stmt->bindParam(2, $filing_no, PDO::PARAM_STR);
+		   $stmt->bindParam(3, $status, PDO::PARAM_STR);
+		   $stmt->bindParam(4, $display, PDO::PARAM_STR);
+		   $stmt->execute();
+		   $connected_cases = $stmt->fetchAll();
+		   return $connected_cases;
+	   }
+	
+	
+	public function get_parties($db,$filing_no,$party_flag){
+		$query = 'select name from e_cases_party where party_flag = ? and filing_no = ? order by party_serial_no';
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $party_flag, PDO::PARAM_STR);
+		$stmt->bindParam(2, $filing_no, PDO::PARAM_STR);
+		$stmt->execute();
+		$parties = $stmt->fetchAll();
+		return $parties;
+	}
+
+	public function  get_legal_representative_details($db,$filing_no,$party_flag)
+	{
+		$na = 'NA';
+		$query = "SELECT distinct(a.rep_code), b.rep_name,b.bar_council_number FROM public.e_more_representative as a
+		join e_master_advocate as b ON a.rep_code = b.id
+		 where  a.display = true and (b.rep_name != ? OR b.rep_name is not null) and a.filing_no = ? and a.party_flag = ?";
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $na, PDO::PARAM_STR);
+		$stmt->bindParam(2, $filing_no, PDO::PARAM_STR);
+		$stmt->bindParam(3, $party_flag, PDO::PARAM_STR);
+		$stmt->execute();
+		$data_party = $stmt->fetchAll();
+		$main_data = array();
+		if (!empty($data_party) && is_array($data_party)) {
+			foreach ($data_party as $val) {
+				$main_data[] = $val['rep_name'];
+			}
+		}
+		return $main_data;
+	}
+
+	public function get_hearing_details($db,$schema,$filing_no,$type=''){
+	
+		$query = "select cp.court_no,cp.listing_date as hearing_date,mp.purpose_name as stage_of_case,cp.bench_no,
+				CASE WHEN cp.next_list_date != '1111-11-11' THEN cp.next_list_date ELSE null END as next_hearing_date
+				from $schema.case_proceeding as cp 
+				left join $schema.master_purpose mp on mp.purpose_code = cp.purpose
+				where cp.filing_no = ?";
+		
+		if($type == 'first'){
+			$order_by = " order by cp.listing_date asc limit 1";
+		}elseif($type == 'last'){
+			$order_by = " order by cp.listing_date desc limit 1";
+		}else{
+			$order_by  = ' order by cp.listing_date desc';
+		}
+		$query .= $order_by;
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$stmt->execute();
+		$listing_info = $stmt->fetchAll();
+		return $listing_info;
+	}
+
+	public function get_case_history($db,$schema,$filing_no){
+	
+		$query = "select cp.filing_no,cp.court_no,cp.listing_date as hearing_date,mp.purpose_name as purpose
+				from $schema.case_proceeding as cp 
+				left join $schema.master_purpose mp on mp.purpose_code = cp.purpose
+				where cp.filing_no = ? order by cp.listing_date desc";
+
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$stmt->execute();
+		$listing_info = $stmt->fetchAll();
+		return $listing_info;
+	}
+
+	public function get_order_history($db,$schema,$filing_no){
+	
+		$flag = 'Y';
+		$query = "select od.order_date,od.order_type,od.pdf_path as order_pdf_download 
+				from $schema.order_daily as od
+				where od.filing_no = ? and od.flag = ? order by od.order_date desc";
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$stmt->bindParam(2, $flag, PDO::PARAM_STR);
+		$stmt->execute();
+		$listing_info = $stmt->fetchAll();
+		return $listing_info;
+	}
+
+	public function get_coram($db, $schema, $listing_date,$bench_no){
+		$coram_name_chairperson = '';
+		$query = "select hon_text,md.desg_name,jm.judge_name,bj.judge_code,jm.judge_desg_code  
+				from $schema.bench_judge as bj,$schema.master_judge as jm
+				Join $schema.master_desg md ON jm.judge_desg_code = md.desg_code
+				where bj.from_list_date =? and bj.bench_no=? and jm.judge_code=bj.judge_code order by jm.judge_desg_code asc"; 
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $listing_date, PDO::PARAM_STR);
+		$stmt->bindParam(2, $bench_no, PDO::PARAM_STR);
+		$stmt->execute();
+		$judge_data = $stmt->fetchAll();
+		$coram_name = '';
+		foreach ($judge_data as $value) {
+			if($value['judge_desg_code'] == '1' || $value['judge_desg_code'] == '6'  || $value['judge_desg_code'] == '7' || $value['judge_desg_code'] == '8' ){
+				$coram_name_chairperson .= $value['hon_text'] . ' ' . $value['judge_name'] . ' (' . $value['desg_name'] . ')';
+				$coram_name_chairperson .= " , ";
+			}else{
+			$coram_name .= $value['hon_text'] . ' ' . $value['judge_name'] . ' (' . $value['desg_name'] . ')';
+			$coram_name .= " , ";
+			}
+		}
+		$final_coram = $coram_name_chairperson.$coram_name;
+		return $final_coram;
+	}
+	
+	public function cause_title($filing_no){
+		$petitioner = $this->get_party($filing_no,$party_flag='P',$type = 'one',$party_serial_no = 1);
+		$petitioner_name = $petitioner['name'];
+		$respondent = $this->get_party($filing_no,$party_flag='R',$type = 'one',$party_serial_no = 1);
+		$respondent_name = $respondent['name'];
+		$title = $petitioner_name." VS ".$respondent_name;
+		return $title;
+	}
+	
+	public function get_listing_info($schema,$filing_no,$type='')
+	{
+		$limit  = '';
+		$query = "select cp.filing_no,cp.court_no,cp.bench_no,cp.listing_date,cp.next_list_date,cp.bench_nature,cp.purpose
+				,cp.todays_status,cp.remarks,mp.purpose_name,mp2.purpose_name as next_purpose,mj.judge_name,ma.action_type,
+				CASE WHEN cp.next_list_date != '1111-11-11' THEN cp.next_list_date ELSE null END as nextdt
+				from $schema.case_proceeding as cp 
+				left join $schema.master_purpose mp on mp.purpose_code = cp.purpose
+				left join $schema.master_action ma on ma.action_code= cp.todays_action
+				left join $schema.master_purpose mp2 on mp2.purpose_code = cp.next_list_purpose
+				left join $schema.bench bn on bn.from_list_date = cp.listing_date and bn.bench_no = cp.bench_no and bn.court_no = cp.court_no
+				left join $schema.master_judge mj on mj.judge_code = bn.presiding
+				where cp.filing_no = ? order by cp.listing_date asc";
+		if($type == 'first'){
+			$limit = " limit 1";
+		}
+		$query .= $limit;
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$stmt->execute();
+		$listing_info = $stmt->fetchAll();
+		return $listing_info;
+	}
+	
+	public function get_listing_history($schema,$filing_no,$type='')
+	{
+		$limit  = '';
+		$query = "select mj.judge_name as judge_name,cp.listing_date as hearing_date,mp.purpose_name,ma.action_type
+				from $schema.case_proceeding as cp 
+				left join $schema.master_purpose mp on mp.purpose_code = cp.purpose
+				left join $schema.master_action ma on ma.action_code= cp.todays_action
+				left join $schema.bench bn on bn.from_list_date = cp.listing_date and bn.bench_no = cp.bench_no and bn.court_no = cp.court_no
+				left join $schema.master_judge mj on mj.judge_code = bn.presiding
+				where cp.filing_no = ? order by cp.listing_date asc";
+		if($type == 'first'){
+			$limit = " limit 1";
+		}
+		
+		//echo $query;
+		$query .= $limit;
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$stmt->execute();
+		$listing_info = $stmt->fetchAll();
+		return $listing_info;
+	}
+
+	public function get_hearing_info($db,$schema,$filing_no,$listing_date){
+		$query = "select cp.filing_no,cp.court_no,cp.listing_date as hearing_date,mp.purpose_name as stage_of_case,
+				cd.case_no,cd.case_year,ct.short_name as case_type,cp.remarks as proceeding_summary,cp.bench_no
+				from $schema.case_proceeding as cp 
+				left join $schema.case_detail as cd on cd.filing_no = cp.filing_no
+				left join case_type as ct on ct.id = cd.case_type
+				left join $schema.master_purpose mp on mp.purpose_code = cp.purpose
+				where cp.filing_no = ? and cp.listing_date = ?";
+		//echo $query;
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$stmt->bindParam(2, $listing_date, PDO::PARAM_STR);
+		$stmt->execute();
+		$listing_info = $stmt->fetchAll();
+		return $listing_info;
+	}
+
+	public function get_order_path($db,$schema,$filing_no,$listing_date){
+		$query = "select pdf_path from $schema.order_daily where filing_no = ? and order_date = ?";
+		$stmt = $this->conn->prepare($query);
+		$stmt->bindParam(1, $filing_no, PDO::PARAM_STR);
+		$stmt->bindParam(2, $listing_date, PDO::PARAM_STR);
+		$stmt->execute();
+		$order = $stmt->fetchColumn();
+		return $order;
+	}
+	
+	public function get_homepage($db){
+		$query = "select final_data.* from (select temp1.filing_no,temp1.case_no,temp1.case_type,temp1.case_year,(coalesce(ecp1.name,'')|| ' VS ' ||coalesce(ecp2.name,'')) as case_title,
+		temp1.date_of_registration, temp1.status,temp1.order_date from  (select 
+		od.filing_no,cast(a.case_no as int) as case_no ,a.case_year,b.short_name as case_type,od.order_date,
+		case when (length(a.main_case_ia_no) = '16') then a.main_case_ia_no else a.filing_no end as party_filing_no,
+		case when (a.backlog = 0) then a.regis_date else null end as date_of_registration,a.status,a.main_case_ia_no
+		from delhi.order_daily as od 
+		inner join delhi.case_detail as a on a.filing_no = od.filing_no												
+		join case_type as b ON b.id = a.case_type 
+		where a.case_no != '' and a.status != 'W'
+		order by od.order_date desc limit 5
+		) as temp1 
+		left join e_cases_party as ecp1 on ecp1.filing_no = temp1.party_filing_no and ecp1.party_flag = 'P' and ecp1.party_serial_no = 1
+		left join e_cases_party as ecp2 on ecp2.filing_no = temp1.party_filing_no and ecp2.party_flag = 'R' and ecp2.party_serial_no = 1
+
+		union all
+																														 
+		select temp1.filing_no,temp1.case_no,temp1.case_type,temp1.case_year,(coalesce(ecp1.name,'')|| ' VS ' ||coalesce(ecp2.name,'')) as case_title,
+		temp1.date_of_registration, temp1.status,temp1.order_date from  (select 
+		od.filing_no,cast(a.case_no as int) as case_no ,a.case_year,b.short_name as case_type,od.order_date,
+		case when (length(a.main_case_ia_no) = '16') then a.main_case_ia_no else a.filing_no end as party_filing_no,
+		case when (a.backlog = 0) then a.regis_date else null end as date_of_registration,a.status,a.main_case_ia_no
+		from chennai.order_daily as od 
+		inner join chennai.case_detail as a on a.filing_no = od.filing_no												
+		join case_type as b ON b.id = a.case_type 
+		where a.case_no != '' and a.status != 'W'
+		order by od.order_date desc limit 5
+		) as temp1 
+		left join e_cases_party as ecp1 on ecp1.filing_no = temp1.party_filing_no and ecp1.party_flag = 'P' and ecp1.party_serial_no = 1
+		left join e_cases_party as ecp2 on ecp2.filing_no = temp1.party_filing_no and ecp2.party_flag = 'R' and ecp2.party_serial_no = 1) as final_data order by final_data.order_date desc";
+		$stmt = $this->conn->prepare($query);
+		$stmt->execute();
+		$data = $stmt->fetchAll();
+		return $data;
+	}
+	
+	
+	
+	
+}
+?>

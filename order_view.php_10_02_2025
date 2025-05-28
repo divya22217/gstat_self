@@ -1,0 +1,20 @@
+<?php 
+
+$path = $_REQUEST['path'];
+$path = urldecode(base64_decode($path));
+
+if (!empty($path) && strstr($path, '/Efile_Document/GSTAT_Documents/CIS_Documents/casedoc/orders/')) {
+//    $path = base64_decode(urldecode($path));
+    $file = time().'.pdf';
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="'.basename($file).'"');
+    readfile($path); 
+} else { 
+  echo 'No documnt';
+}
+
+
+
+
+?> 
+

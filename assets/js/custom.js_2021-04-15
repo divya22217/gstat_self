@@ -1,0 +1,375 @@
+
+function viewpdf(pdfpath)
+  {
+	var loader = "<center><img src='../loader/loader.gif'></img></center>";
+	   $.ajax({
+            type: "POST",
+            url: "../scrutiny/generate_pdf.php",
+            data: {pdfpath:pdfpath},
+			beforeSend: function() {
+				$("#view_pdf").css('height','500');
+				$("#view_pdf").html(loader);
+			},
+            success: function (data) {
+				
+				$("#view_pdf").css('height','500');
+				$("#view_pdf").html(loader);
+			   $("#view_pdf").html(data);
+			   //alert("success");
+            },
+            error: function (textStatus, errorThrown) {
+				$("#view_pdf").html('');
+               alert("error");
+            }
+
+        });
+  }
+  
+  $(document).on('click',"#close_pdf",function(){
+	  
+	 $("#view_pdf").css('height','1');
+	 $("#view_pdf").html('');   
+  });
+  
+  function viewpdf_new(pdfpath)
+  {
+	$("#objection_tab").removeClass("col-sm-12 col-md-12 col-lg-12").addClass("col-sm-6 col-md-6 col-lg-6");  
+	var loader = "<center><img src='../loader/loader.gif'></img></center>";
+	var height = $("#accordion-1").height();
+	height = height+20;
+	   $.ajax({
+            type: "POST",
+            url: "../scrutiny/generate_pdf.php",
+            data: {pdfpath:pdfpath,type:1},
+			beforeSend: function() {
+				
+				$("#view_pdf").css('height',height);
+				$("#view_pdf").html(loader);
+			},
+            success: function (data) {
+				
+				$("#view_pdf").css('height',height);
+				$("#view_pdf").html(loader);
+			   $("#view_pdf").html(data);
+			   //alert("success");
+            },
+            error: function (textStatus, errorThrown) {
+				$("#view_pdf").html('');
+               alert("error");
+            }
+
+        });
+  }
+  
+  $(document).on('click',"#close_pdf_new",function(){
+	  $("#pdf_tab").removeClass("col-sm-6 col-md-6 col-lg-6");
+		$("#objection_tab").removeClass("col-sm-6 col-md-6 col-lg-6").addClass("col-sm-12 col-md-12 col-lg-12");  	  
+	 $("#view_pdf").css('height','1');
+	 $("#view_pdf").html('');   
+  });
+  
+   $(document).on('change',"#report_type",function(){
+	  var type = $("#report_type").val();
+	  var menuaccess_codeall = $("#search_menuaccess_codeall").val();
+	  var case_type_radio = $("#search_c_case").val();
+	  var diary_name = $("#dynamic_diary_name").val();
+	  if(type == '1'){
+		var search_form = '<div class="row"><div class="col-sm-4"><div class="form-group"><label class="label-control col-sm-4" for="start_date">From</label><div class="form-group"><input type="text" class="form-control datepicker" name="start_date" id="start_date" placeholder="Enter From Date"></div></div></div><div class="col-sm-4"><div class="form-group"><label for="to_date" class="label-control col-sm-4">To:</label><div class="form-group"><input type="text" name="to_date" class="form-control datepicker" placeholder="Enter To Date" id="to_date"></div></div></div><div class="col-sm-4" style="margin-top:2%;"><div class="form-group"><label for="to_date" class="label-control col-sm-4"></label><div class="form-group"><div class="form-group"><button type="button" class="btn btn-success" onClick="return get_filtred_date(1);">Search</button></div></div></div></div>';
+		$("#search_form").html(search_form);
+	  }else if(type == '2'){
+		var search_form = '<div class="row"><div class="col-sm-6"><div class="form-group"><label class="label-control col-sm-6" for="search_filing_no">'+diary_name+'</label><div class="form-group"><input type="text" name="search_filing_no" class="form-control" placeholder="Enter '+diary_name+'" id="search_filing_no"></div></div></div><div class="col-sm-6" style="margin-top:2%;"><div class="form-group"><label for="to_date" class="label-control col-sm-4"></label><div class="form-group"><div class="form-group"><button type="button" class="btn btn-success" onClick="return get_filtred_date(2);">Search</button></div></div></div></div>';
+		$("#search_form").html(search_form);
+	  }else{
+		alert('plese select any search type');
+		$("#search_form").html('');
+		return false;
+	  }
+  });
+  
+  function get_filtred_date(search_type){
+	var user_type = $("#search_menuaccess_codeall").val();
+	var selected_case_type = $("#search_c_case").val();
+	var data_to_send = '';
+	if(search_type == '1'){
+		var data1 = $("#start_date").val();
+		var data2 = $("#to_date").val();
+		
+		data_to_send = data1+"||"+data2;
+	}
+	if(search_type == '2'){
+		var search_filing_no = $("#search_filing_no").val();
+		data_to_send = search_filing_no;
+	}
+	$.ajax({
+		type: "POST",
+		url: "ajax/custom_search.php",
+		data: {search_type : search_type, user_type:user_type, selected_case_type:selected_case_type, data_to_send:data_to_send},
+		beforeSend: function() {
+			
+		},
+		success: function (data) {
+			if(selected_case_type == 1){
+			$("#case_one_scrutiny_clerk").html(data);
+			}
+			if(selected_case_type == 3){
+			$("#ia_ma_data").html(data);
+			}
+		},
+		error: function (textStatus, errorThrown) {
+		   alert("error");
+		}
+
+	});
+  }
+  
+function get_form(search_type,dynamic_param){
+	search_type = '1';
+	$.ajax({
+		type: "POST",
+		url: "../ajax/connected_cases.php",
+		data: {type:"get_form",search_type:search_type},
+		success: function (data) {
+			if(data != ''){
+				var obj = JSON.parse(data);
+				if(obj.type == '1'){
+					$("#search_form"+dynamic_param+" #case_no_wise_search_form"+dynamic_param+" #case_type"+dynamic_param).html('');
+					$("#search_form"+dynamic_param+" #case_no_wise_search_form"+dynamic_param+" #bench"+dynamic_param).html('');
+					$.each( obj.bench, function( key, value ) {
+						var o = new Option(value.city_name, value.city_id);
+						$(o).html(value.city_name);
+						$("#search_form"+dynamic_param+" #case_no_wise_search_form"+dynamic_param+" #bench"+dynamic_param).append(o);
+					});
+					$.each( obj.case_types, function( key, value ) {
+						var o = new Option(value.case_type_desc, value.id);
+						$(o).html(value.case_type_desc);
+						$("#search_form"+dynamic_param+" #case_no_wise_search_form"+dynamic_param+" #case_type"+dynamic_param).append(o);
+					});
+					$("#search_form"+dynamic_param+" #case_no_wise_search_form"+dynamic_param+" #case_no"+dynamic_param).val('');
+					$("#search_form"+dynamic_param+" #case_no_wise_search_form"+dynamic_param+" #case_year"+dynamic_param).val('');
+					$("#search_form"+dynamic_param+" #case_no_wise_search_form"+dynamic_param).css('display','inherit');
+					$("#search_form"+dynamic_param+" #filing_no_wise_search_form"+dynamic_param).css('display','none');
+					
+				}else{
+					$("#search_form"+dynamic_param+" #filing_no_wise_search_form"+dynamic_param+" #bench"+dynamic_param).html('');
+					$.each( obj.bench, function( key, value ) {
+						var o = new Option(value.city_name, value.city_id);
+						$(o).html(value.city_name);
+						$("#search_form"+dynamic_param+" #filing_no_wise_search_form"+dynamic_param+" #bench"+dynamic_param).append(o);
+						$("#search_form"+dynamic_param+" #filing_no_wise_search_form"+dynamic_param+" #filing_no_"+dynamic_param).val('');
+						$("#search_form"+dynamic_param+" #filing_no_wise_search_form"+dynamic_param).css('display','inherit');
+						$("#search_form"+dynamic_param+" #case_no_wise_search_form"+dynamic_param).css('display','none');
+					});
+				}
+			}else{
+				alert("search type error");
+			}
+			if(dynamic_param == ''){
+				$("#view_connected_cases,#cause_title").removeClass('show');
+				$("#view_connected_cases,#cause_title").addClass('hide');
+			}else{
+				$("#search_button_second").css('display',"inherit");
+			}
+		},
+		error: function (textStatus, errorThrown) {
+		   alert("error");
+		}
+
+	});
+}
+
+function get_cases(dynamic_param,type){
+	if(dynamic_param == ''){
+	$("#view_connected_cases #table_data #search_data_here").html('');
+	}
+	//var search_type = $("#search_type").val();
+	var search_type = '1';
+	var form_data = {};
+	form_data['search_type'] = search_type;
+	if(search_type == 1){
+		var location_id = $("#bench"+dynamic_param).val();
+		var case_type = $("#case_type"+dynamic_param).val();
+		var case_no = $("#case_no"+dynamic_param).val();
+		var case_year = $("#case_year"+dynamic_param).val();
+		if(case_no == '' && case_year == ''){
+			alert("please enter case number and case year");
+			return false;
+		}
+		if(case_no == ''){
+			alert("please enter case number");
+			return false;
+		}
+		if(case_year == ''){
+			alert("please enter case year");
+			return false;
+		}
+		form_data['location_id'] = location_id;
+		form_data['case_type'] = case_type;
+		form_data['case_no'] = case_no;
+		form_data['case_year'] = case_year;
+	}else{
+		var location_id = $("#bench"+dynamic_param).val();
+		var filing_no = $("#filing_no"+dynamic_param).val();
+		form_data['location_id'] = location_id;
+		form_data['filing_no'] = filing_no;
+	}
+	var main_filing_no = $("#set_filing_no").val();
+	$.ajax({
+		type: "POST",
+		url: "../ajax/connected_cases.php",
+		data: {form_data:form_data,type:"get_connected_cases",dynamic_param:dynamic_param,main_filing_no:main_filing_no,con_type:type},
+		beforeSend: function() {
+		},
+		success: function (response) {
+			if(dynamic_param == ''){
+			$("#view_connected_cases,#cause_title").removeClass('show');
+			$("#view_connected_cases,#cause_title").addClass('hide');
+			}else{
+			$("#cause_title"+dynamic_param).removeClass('show');
+			$("#cause_title"+dynamic_param).addClass('hide');	
+			}
+			var obj = JSON.parse(response);
+			if(obj.status == 'error'){
+				alert(obj.msg);
+				$("#cause_title"+dynamic_param+" h4").html(obj.msg);
+				$("#cause_title"+dynamic_param).removeClass('hide');
+				$("#cause_title"+dynamic_param).addClass('show');
+				if(dynamic_param == ''){
+				$("#search_form_second").css('display','none');
+				$("#cause_title_second").removeClass('show');
+				$("#cause_title_second").addClass('hide');
+				$("#set_filing_no,#set_con_filing_no").val('');
+				}else{
+					$("#set_con_filing_no").val('');
+				}						
+				$("#connect_button_second").removeClass('show');
+				$("#connect_button_second").addClass('hide');	
+				return false;
+			}else{
+				$("#search_form_second").css('display','inherit');
+				$("#cause_title_second").removeClass('hide');
+				$("#cause_title_second").addClass('show');	
+				//alert(dynamic_param+"sdfsdjkl");
+				$("#cause_title"+dynamic_param+" h4").html(obj.main_case.pet_name+' VS. '+obj.main_case.res_name);
+				
+				if(dynamic_param == ''){
+					if(obj.type == 'con'){
+						$.each( obj.connected_cases, function( key, value ) {
+							var count = (key+1);
+							var tr = '<tr><td>'+count+'</td><td>'+value.conn_filing_no+'</td><td>'+value.case_type_short_name+'/'+value.case_no+'('+value.city_short_name+')/'+value.case_year+'</td><td>'+value.status+'</td></tr>';
+							$("#view_connected_cases #table_data #search_data_here").append(tr);
+						});
+					}else{
+						$.each( obj.connected_cases, function( key, value ) {
+							var count = (key+1);
+							var disconnect_link = "<button type='button' class='btn btn-sm btn-danger' onClick='disconnect_case("+value.id+","+obj.main_case.filing_no+","+value.conn_filing_no+");'>Disconnect</button>";
+							var tr = '<tr id="row"'+value.id+'><td>'+count+'</td><td>'+value.conn_filing_no+'</td><td>'+value.case_type_short_name+'/'+value.case_no+'('+value.city_short_name+')/'+value.case_year+'</td><td>'+disconnect_link+'</td></tr>';
+							$("#view_connected_cases #table_data #search_data_here").append(tr);
+						});
+					}
+				
+				$("#cause_title , #view_connected_cases").addClass('show');
+				$("#cause_title, #view_connected_cases").removeClass('hide');
+				$("#cause_title_second").addClass('hide');
+				$("#cause_title_second").addClass('show');
+				$("#connect_button_second").removeClass('show');
+				$("#connect_button_second").addClass('hide');
+				$("#set_filing_no").val(obj.main_case.filing_no);
+				get_form(search_type,"_second");
+				}else{
+					$("#cause_title"+dynamic_param).addClass('show');
+					$("#cause_title"+dynamic_param).removeClass('hide');
+					$("#connect_button"+dynamic_param).removeClass('hide');
+					$("#connect_button"+dynamic_param).addClass('show');
+					$("#set_con_filing_no").val(obj.main_case.filing_no);
+				}
+				
+			}
+		},
+		error: function (textStatus, errorThrown) {
+		   alert("error");
+		}
+
+	});	
+}
+	
+function connect_case(){
+	var main_filing_no = $("#set_filing_no").val();
+	var conn_filing_no = $("#set_con_filing_no").val();
+	if(main_filing_no === '' || conn_filing_no === ''){
+		alert("Please fill all details");
+		return false;
+	}
+	$("#connect_case").attr('disabled','disabled');
+	$.ajax({
+            type: "POST",
+            url: "../ajax/connected_cases.php",
+            data: {main_filing_no:main_filing_no,conn_filing_no:conn_filing_no,type:"connect_case"},
+			beforeSend: function() {
+			},
+            success: function (response) {
+				var obj = JSON.parse(response);
+				if(obj.status == 'error'){
+					alert(obj.msg);
+				}else{
+					alert(obj.msg);
+					location.reload(true);
+				}
+            },
+            error: function (textStatus, errorThrown) {
+               alert("error");
+            }
+
+        });	
+	
+}
+
+function disconnect_case(id,main_filing_no,conn_filing_no){
+	//alert(main_filing_no);
+	//return false;
+	$.ajax({
+	type: "POST",
+	url: "../ajax/connected_cases.php",
+	data: {id:id,main_filing_no:main_filing_no,conn_filing_no:conn_filing_no,type:"disconnect_case"},
+	beforeSend: function() {
+	},
+	success: function (response) {
+		var obj = JSON.parse(response);
+		if(obj.status == 'error'){
+			alert(obj.msg);
+		}else{
+			alert(obj.msg);
+			//$("#row"+id).remove();
+			location.reload(true);
+		}
+	},
+	error: function (textStatus, errorThrown) {
+	   alert("error");
+}
+	});
+}
+  
+  
+ function view_order(pdfpath)
+  {
+	var loader = "<center><img src='../loader/loader.gif'></img></center>";
+	   $.ajax({
+            type: "POST",
+            url: "../scrutiny/generate_pdf.php",
+            data: {pdfpath:pdfpath},
+			beforeSend: function() {
+				$("#view_order_body").html(loader);
+				$("#view_order").modal('show');
+			},
+            success: function (data) {
+			$("#view_order_body").html(data);
+			   //alert("success");
+            },
+            error: function (textStatus, errorThrown) {
+				$("#view_order_body").html('');
+				$("#view_order").modal('hide');
+               alert("error");
+            }
+
+        });
+  }
+ 

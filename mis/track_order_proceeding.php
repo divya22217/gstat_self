@@ -1,0 +1,429 @@
+<?php
+// File used to connect to database
+header("Cache-Control: private");
+header("Cache-Control: no-cache, no-store, must-revalidate");
+header("Pragma: no-cache");
+header("Cache-Control=proxy-revalid");
+/* 
+  ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);  */  
+
+include("../db_inc1.php");
+
+
+ include("../inheader.php");
+include("../custom/custom_function.php");
+
+$date = htmlspecialchars(date("d/m/Y"));
+$date1 = htmlspecialchars(date("F j, Y g:i a"));
+$msg_ip = isset($_REQUEST['msg_ip']) ? $_REQUEST['msg_ip'] :'';
+$year=htmlspecialchars(date("Y"));
+$msg_ip .= "User IP : ".$_SERVER["REMOTE_ADDR"]."\r\n"; //Sender's IP
+$user = $_SESSION['user'];
+$location_id = $_SESSION['location'];
+
+
+
+
+// At the top of the page we check to see whether the user is logged in or not
+if(empty($_SESSION['user']) and $_SESSION['location']=='')
+{
+	// If they are not, we redirect them to the login page.
+	// Remember that this die statement is absolutely critical.  Without it,
+	// people can view your members-only content without logging in.
+	die("Redirecting to login.php");
+}
+if(($_SESSION['user'])=='')
+{
+	echo "you Can't access this page";
+}
+else
+ {
+	
+	
+	
+function remove_path($file, $path = UPLOAD_PATH) {
+if(strpos($file, $path) !== FALSE) {
+return substr($file, strlen($path));
+}
+}
+
+$frm = md5( uniqid('auth', true) );
+
+/*** set the session form token ***/
+$_SESSION['form_token'] = $frm;//csrf
+
+$schemas=htmlspecialchars($_SESSION['schema_name']);
+$user_id=$_SESSION['id'];
+$main_cases = main_case_type();	
+
+function is_proceeded($db,$schemas,$filing_no,$list_date_post,$selected_court){
+	$query = "select count(*) from $schemas.case_proceeding where filing_no = ? and listing_date = ? and court_no = ?";
+	//echo $query;
+	$report_data = $db->prepare($query);
+	$report_data->bindParam(1, $filing_no, PDO::PARAM_STR);
+	$report_data->bindParam(2, $list_date_post, PDO::PARAM_STR);
+	$report_data->bindParam(3, $selected_court, PDO::PARAM_STR);
+	$report_data->execute();
+	$report_data = $report_data->fetchColumn();
+	return $report_data;
+}
+
+function is_order_uploaded($db,$schemas,$filing_no,$list_date_post){
+	$flag = 'Y';
+	$query = "select pdf_path,entry_date from $schemas.order_daily where filing_no = ? and order_date = ? and flag = ?";
+	//echo $query;
+	$report_data = $db->prepare($query);
+	$report_data->bindParam(1, $filing_no, PDO::PARAM_STR);
+	$report_data->bindParam(2, $list_date_post, PDO::PARAM_STR);
+	$report_data->bindParam(3, $flag, PDO::PARAM_STR);
+	$report_data->execute();
+	$report_data = $report_data->fetch();
+	return $report_data;
+}
+
+function selected_final_cases($schemas,$db,$filing_no,$display,$listing_date,$bench_no,$list_flag,$court_no,$child_or_connected,$listed_filing_no){
+	if(!empty($listed_filing_no)){
+	$stq = $db->prepare("select fcc.filing_no,cd.dt_of_filing,cd.regis_date,cd.case_no,cd.case_type,cd.case_year,cd.main_case_ia_no,cd.transfrred_case_type_short,ct.case_type_desc,mlc.short_name,fcc.pet_name,fcc.res_name from $schemas.final_child_and_connected_cases as fcc 
+						LEFT JOIN $schemas.case_detail as cd on cd.filing_no = fcc.filing_no 
+						LEFT JOIN case_type as ct on ct.id = cd.case_type 
+						LEFT JOIN mater_location_city as mlc ON mlc.city_id = cd.location_code
+						where fcc.parent_filing_no = ? and fcc.display = ? and fcc.listing_date = ? and fcc.bench_no = ? and fcc.list_flag = ? and fcc.court_no=? and fcc.child_or_connected = ? and listed_filing_no = ? order by cd.case_year,cd.case_no asc");
+	}else{
+	$stq = $db->prepare("select fcc.filing_no,cd.dt_of_filing,cd.regis_date,cd.case_no,cd.case_type,cd.case_year,cd.main_case_ia_no,cd.transfrred_case_type_short,ct.case_type_desc,mlc.short_name,fcc.pet_name,fcc.res_name from $schemas.final_child_and_connected_cases as fcc 
+						LEFT JOIN $schemas.case_detail as cd on cd.filing_no = fcc.filing_no 
+						LEFT JOIN case_type as ct on ct.id = cd.case_type 
+						LEFT JOIN mater_location_city as mlc ON mlc.city_id = cd.location_code
+						where fcc.parent_filing_no = ? and fcc.display = ? and fcc.listing_date = ? and fcc.bench_no = ? and fcc.list_flag = ? and fcc.court_no=? and fcc.child_or_connected = ? order by cd.case_year,cd.case_no asc");
+	}
+	$stq->bindParam(1, $filing_no, PDO::PARAM_STR);
+	$stq->bindParam(2, $display, PDO::PARAM_STR);
+	$stq->bindParam(3, $listing_date, PDO::PARAM_STR);
+	$stq->bindParam(4, $bench_no, PDO::PARAM_STR);
+	$stq->bindParam(5, $list_flag, PDO::PARAM_STR);
+	$stq->bindParam(6, $court_no, PDO::PARAM_STR);
+	$stq->bindParam(7, $child_or_connected, PDO::PARAM_STR);
+	if(!empty($listed_filing_no)){
+		$stq->bindParam(8, $listed_filing_no, PDO::PARAM_STR);
+	}
+	$stq->execute();
+	$res = $stq->fetchAll();
+	return $res;
+}
+
+?>
+
+
+
+
+
+	
+
+	<script src="../plugins/jQueryUI/jquery-1.12.4.js"></script>
+	<link rel="stylesheet" href="../plugins/jQueryUI/jquery-ui.css">
+	<script src="../plugins/jQueryUI/jquery-ui.js"></script>
+	<script src="../plugins/jQueryUI/date.js"></script>
+	
+	
+<link rel="stylesheet" type="text/css" href="../includes/highslide/highslide.css" />
+<script type="text/javascript" src="../includes/highslide/highslide-with-html1.js"></script>
+<link rel="stylesheet" type="text/css" href="../datatable/css/jquery.dataTables.min.css">
+<link rel="stylesheet" type="text/css" href="../datatable/css/buttons.dataTables.min.css">
+	<script language="javascript">
+	//start of my script
+	function submitForm3()
+{
+ 	with(document.frm)
+	{		
+	 action = "track_order_proceeding.php";
+	 submit();
+	}
+}
+
+
+	</script>
+
+	<style>
+		table, td, th {
+			border: 1px solid #ffffff;
+		}
+
+
+
+		th {
+			background-color: #008b43;
+			color: white;
+		}
+	</style>
+</head>
+
+
+<div class="wrapper" style="background-color:#ffffff;">
+
+	
+
+	<div class="content-wrapper" style="min-height: 946px;">
+		<!-- Content Header (Page header) -->
+		<section class="content">
+
+
+<table class="table">
+<tr>
+	<th valign="top" align="center" colspan="16">
+					<b><font face="Verdana" size="3"><u>Track Order/ Proceeding</u></font> </b>
+	</th>
+	</tr>
+<form name="frm" method="post" action="">
+
+<tr><td colspan="16"></td></tr>
+
+<?php  $listing_date = isset($_REQUEST['listing_date']) ? $_REQUEST['listing_date'] :'';
+		$selected_court  = isset($_REQUEST['court_no']) ? $_REQUEST['court_no'] : '';
+		
+ ?>
+<tr><td colspan="16">
+
+<font color="red">*</font><font size="1">Listing Date:</font>
+<input type="text" id="listing_date" name="listing_date" class="datepicker"
+readonly="readonly" size="8" autocomplete="off" maxlength="10" value="<?php print htmlspecialchars($listing_date); ?>" />
+
+Court No : <select name='court_no' id='court_no' required>
+			<option value="" >Select Court Type</option>
+			<?php 
+				 $query = "select * from $schemas.court";
+				$res = $db->prepare($query);
+				$res->execute();
+				$all_courts = $res->fetchAll();
+				foreach($all_courts as $court) { ?>
+					<option value='<?php echo $court['court_no']; ?>' <?php echo ($selected_court == $court['court_no'])?'selected':''; ?> ><?php echo $court['display_court_text']; ?></option>
+			<?php	} 
+			?>
+			</select>
+<input type="submit" id="submit11" name="submit11" value="Search" />
+</td>
+</tr>
+</form>
+</table>
+<div class='table-responsive'>
+
+<?php
+ if(isset($_POST['submit11'])){ 
+
+	if($selected_court == ''){
+			echo "<tr><td colspan='6' style='color:red;'>Please select court</td></tr>";
+		}
+
+		list($day,$month,$year)=explode('/',$listing_date);
+		 $list_date_post=$year.'-'.$month.'-'.$day;
+
+			$query = "select a.filing_no ,a.remarks,a.pet_name,a.res_name,d.case_no,d.case_year,d.case_type,ct.case_type_desc,a.list_flag,a.bench_no,
+					mlc.short_name,d.dt_of_filing,d.regis_date,d.main_case_ia_no,d.transfrred_case_type_short from $schemas.case_allocation a
+					left join $schemas.case_detail as d on d.filing_no = a.filing_no 
+					left join case_type as ct on ct.id = d.case_type 
+					left join mater_location_city as mlc on mlc.city_id = d.location_code 
+					where a.listing_date=? and a.court_no=? order by a.priority_serial,d.case_no,d.case_year asc";
+			//echo $query;
+			$report_data = $db->prepare($query);
+			$report_data->bindParam(1, $list_date_post, PDO::PARAM_STR);
+			$report_data->bindParam(2, $selected_court, PDO::PARAM_STR);
+			$report_data->execute();
+			$report_data = $report_data->fetchAll(); ?>
+			<table class='table table-responsive table-hover table-bordered' id="case_details">
+				<thead>
+					<tr>
+						<th>SN</th>
+						<th>Diary No</th>
+						<th>Case no</th>
+						<th>Date of filing</th>
+						<th>Date of Registration</th>
+						<th>Case Title</th>
+						<th>Proceeding Status</th>
+						<th>Order Status</th>
+						<th>Order Upload Date</th>
+					</tr>
+				</thead>
+				<tbody>
+			<?php if(!empty($report_data)){ 
+				$sn = 1;
+				foreach($report_data as $k=>$report)
+				{
+					
+					$bench_code1 = $report['bench_no'];
+					$list_flag = $report['list_flag'];
+					if($report['main_case_ia_no'] == '')
+						$party_filing_no = $report['filing_no'];
+					else
+						$party_filing_no = $report['main_case_ia_no'];
+					
+					$pet_name = get_party($db,$party_filing_no,'P',1);
+					$res_name = get_party($db,$party_filing_no,'R',1);
+					
+					$transfrred_case_type_short = $report['transfrred_case_type_short'];
+					$tr_short = '';
+					if(!empty($transfrred_case_type_short)){
+						$tr_short = " ($transfrred_case_type_short)";
+					}
+					$is_proceeded = is_proceeded($db,$schemas,$report['filing_no'],$list_date_post,$selected_court);
+					$is_order_uploaded = is_order_uploaded($db,$schemas,$report['filing_no'],$list_date_post);
+					if(!empty($is_order_uploaded['entry_date'] && $is_order_uploaded['entry_date'] <= '2022-01-06')){
+						$upload_date_time = date('d/m/Y',strtotime($is_order_uploaded['entry_date']));
+					}elseif(!empty($is_order_uploaded['entry_date'] && $is_order_uploaded['entry_date'] > '2022-01-06')){
+						$upload_date_time = date('d/m/Y H:i:s',strtotime($is_order_uploaded['entry_date']));
+					}else{
+						$upload_date_time = '';
+					}
+					
+			?>
+				<tr>
+					<td><?php echo $sn; ?></td>
+					<td><?php echo $report['filing_no']; ?></td>
+					<td><?php echo $report['case_type_desc'].$tr_short.'/'.$report['case_no'].'/'.$report['case_year']; ?></td>
+					<td><?php echo (!empty($report['dt_of_filing']))?date('d/m/Y',strtotime($report['dt_of_filing'])):''; ?></td>
+					<td><?php echo (!empty($report['regis_date']))?date('d/m/Y',strtotime($report['regis_date'])):''; ?></td>
+					<td><?php echo $pet_name.' <br/>VS<br/> '.$res_name; ?></td>
+					<td><?php echo ($is_proceeded > 0)?"<font style='color:green;'><b>Proceeded</b></font>":"<font style='color:red;'><b>Not Proceeded</b></font>"; ?></td>
+					<td><?php echo (!empty($is_order_uploaded))?"<a href='../order_view.php?path=".base64_encode($is_order_uploaded['pdf_path'])."' target='_blank' ><i class='fa fa-file-pdf' style='color:#ba290e;' aria-hidden='true'></i>&nbsp;&nbsp;&nbsp;Download</a>":"  <font style='color:red;'><b>Order not uploaded</b></font>"; ?></td>
+					<td><?php echo $upload_date_time; ?></td>
+					
+				</tr>
+			<?php
+			$child_cases = selected_final_cases($schemas,$db,$report['filing_no'],1,$list_date_post,$bench_code1,$list_flag,$selected_court,$child_or_connected = 'I',''); 
+			$child_cases_of_main = selected_final_cases($schemas,$db,$party_filing_no,1,$list_date_post,$bench_code1,$list_flag,$selected_court,$child_or_connected = 'I',$report['filing_no']); 
+			$connected_cases =  selected_final_cases($schemas,$db,$report['filing_no'],1,$list_date_post,$bench_code1,$list_flag,$selected_court,$child_or_connected = 'C',''); 
+			$all_cases = array_merge($child_cases,$child_cases_of_main,$connected_cases);
+			if(!empty($all_cases)){
+				foreach($all_cases as $kk=>$case){
+					$sn++;
+					if($case['main_case_ia_no'] == '')
+						$party_filing_no = $case['filing_no'];
+					else
+						$party_filing_no = $case['main_case_ia_no'];
+					
+					$pet_name = get_party($db,$party_filing_no,'P',1);
+					$res_name = get_party($db,$party_filing_no,'R',1);
+					
+					$transfrred_case_type_short = $case['transfrred_case_type_short'];
+					$tr_short = '';
+					if(!empty($transfrred_case_type_short)){
+						$tr_short = " ($transfrred_case_type_short)";
+					}
+					$is_proceeded = is_proceeded($db,$schemas,$case['filing_no'],$list_date_post,$selected_court);
+					$is_order_uploaded = is_order_uploaded($db,$schemas,$case['filing_no'],$list_date_post);
+					if(!empty($is_order_uploaded['entry_date'] && $is_order_uploaded['entry_date'] <= '2022-01-06')){
+						$upload_date_time = date('d/m/Y',strtotime($is_order_uploaded['entry_date']));
+					}elseif(!empty($is_order_uploaded['entry_date'] && $is_order_uploaded['entry_date'] > '2022-01-06')){
+						$upload_date_time = date('d/m/Y H:i:s',strtotime($is_order_uploaded['entry_date']));
+					}else{
+						$upload_date_time = '';
+					}
+					
+			?>
+				<tr>
+					<td><?php echo $sn; ?></td>
+					<td><?php echo $case['filing_no']; ?></td>
+					<td><?php echo $case['case_type_desc'].$tr_short.'/'.$case['case_no'].'/'.$case['case_year']; ?></td>
+					<td><?php echo (!empty($case['dt_of_filing']))?date('d/m/Y',strtotime($case['dt_of_filing'])):''; ?></td>
+					<td><?php echo (!empty($case['regis_date']))?date('d/m/Y',strtotime($case['regis_date'])):''; ?></td>
+					<td><?php echo $pet_name.' <br/>VS<br/> '.$res_name; ?></td>
+					<td><?php echo ($is_proceeded > 0)?"<font style='color:green;'><b>Proceeded</b></font>":"<font style='color:red;'><b>Not Proceeded</b></font>"; ?></td>
+					<td><?php echo (!empty($is_order_uploaded))?"<a href='../order_view.php?path=".base64_encode($is_order_uploaded['pdf_path'])."' target='_blank' ><i class='fa fa-file-pdf' style='color:#ba290e;' aria-hidden='true'></i>&nbsp;&nbsp;&nbsp;Download</a>":"  <font style='color:red;'><b>Order not uploaded</b></font>"; ?></td>
+					<td><?php echo $upload_date_time; ?></td>
+					
+				</tr> 
+				<?php 
+				$child_case_of_conn = selected_final_cases($schemas,$db,$case['filing_no'],1,$list_date_post,$bench_code1,$list_flag,$selected_court,$child_or_connected = 'I',''); 
+				if(!empty($child_case_of_conn)){
+						foreach($child_case_of_conn as $kk=>$child_case_of_conn_case){
+							$sn++;
+							if($child_case_of_conn_case['main_case_ia_no'] == '')
+								$party_filing_no = $child_case_of_conn_case['filing_no'];
+							else
+								$party_filing_no = $child_case_of_conn_case['main_case_ia_no'];
+							
+							$pet_name = get_party($db,$party_filing_no,'P',1);
+							$res_name = get_party($db,$party_filing_no,'R',1);
+							
+							$transfrred_case_type_short = $child_case_of_conn_case['transfrred_case_type_short'];
+							$tr_short = '';
+							if(!empty($transfrred_case_type_short)){
+								$tr_short = " ($transfrred_case_type_short)";
+							}
+							$is_proceeded = is_proceeded($db,$schemas,$child_case_of_conn_case['filing_no'],$list_date_post,$selected_court);
+							$is_order_uploaded = is_order_uploaded($db,$schemas,$child_case_of_conn_case['filing_no'],$list_date_post);
+							if(!empty($is_order_uploaded['entry_date'] && $is_order_uploaded['entry_date'] <= '2022-01-06')){
+								$upload_date_time = date('d/m/Y',strtotime($is_order_uploaded['entry_date']));
+							}elseif(!empty($is_order_uploaded['entry_date'] && $is_order_uploaded['entry_date'] > '2022-01-06')){
+								$upload_date_time = date('d/m/Y H:i:s',strtotime($is_order_uploaded['entry_date']));
+							}else{
+								$upload_date_time = '';
+							}
+							
+					?>
+						<tr>
+							<td><?php echo $sn; ?></td>
+							<td><?php echo $child_case_of_conn_case['filing_no']; ?></td>
+							<td><?php echo $child_case_of_conn_case['case_type_desc'].$tr_short.'/'.$child_case_of_conn_case['case_no'].'/'.$child_case_of_conn_case['case_year']; ?></td>
+							<td><?php echo (!empty($child_case_of_conn_case['dt_of_filing']))?date('d/m/Y',strtotime($child_case_of_conn_case['dt_of_filing'])):''; ?></td>
+							<td><?php echo (!empty($child_case_of_conn_case['regis_date']))?date('d/m/Y',strtotime($child_case_of_conn_case['regis_date'])):''; ?></td>
+							<td><?php echo $pet_name.' <br/>VS<br/> '.$res_name; ?></td>
+							<td><?php echo ($is_proceeded > 0)?"<font style='color:green;'><b>Proceeded</b></font>":"<font style='color:red;'><b>Not Proceeded</b></font>"; ?></td>
+							<td><?php echo (!empty($is_order_uploaded))?"<a href='../order_view.php?path=".base64_encode($is_order_uploaded['pdf_path'])."' target='_blank' ><i class='fa fa-file-pdf' style='color:#ba290e;' aria-hidden='true'></i>&nbsp;&nbsp;&nbsp;Download</a>":"  <font style='color:red;'><b>Order not uploaded</b></font>"; ?></td>
+							<td><?php echo $upload_date_time; ?></td>
+					
+							
+						</tr> 
+						<?php 
+						
+						
+						}
+					}
+				}
+			} 
+			$sn++;
+			} }
+			echo "</tbody></table>";
+
+ 
+
+ 
+
+} ?>
+	 </div>
+	</div>
+
+</section>
+
+
+<?php include '../infooter.php'; ?>
+<script src="../datatable/js/jquery.dataTables.min.js"></script>
+<script src="../datatable/js/dataTables.buttons.min.js"></script>
+<script src="../datatable/js/buttons.flash.min.js"></script>
+<script src="../datatable/js/jszip.min.js"></script>
+<script src="../datatable/js/pdfmake.min.js"></script>
+<script src="../datatable/js/vfs_fonts.js"></script>
+<script src="../datatable/js/buttons.html5.min.js"></script>
+<script src="../datatable/js/buttons.print.min.js"></script>
+<!-- Theme JS files -->
+<script src="../datatable/js/datatables_extension_buttons_html5.js"></script>
+<script>
+	$(document).ready(function() {
+	
+    $('#case_details').DataTable({
+        "pageLength": -1,
+		"lengthMenu": [[100, 200, 500, -1], [100, 200, 500, "All"]],
+		 buttons: [
+            {
+                extend: 'excel',
+                title: 'excel_report' 
+            },
+            {
+                extend: 'csv',
+                title: 'csv_report' 
+            }
+        ]
+    });
+});
+</script>
+
+<?php } ?>

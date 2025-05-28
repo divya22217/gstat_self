@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<body>
+<form id="upload-order" action="http://efiling.nclt.gov.in/dms-ecourt/cis-order-document-uploading"	enctype="multipart/form-data" method="post">
+
+<input type="text" id="dairyno" name="dairyno" class="form-control" placeholder="dairyno no" value="<?php print htmlentities(htmlspecialchars($filing_no)); ?>" required="required">
+<input type="hidden" name="j_key" value="vVl/Az1yGsjOAG18WDeScg==">
+<input type="hidden" name="j_securityKey" value="TZFIMZbTiUtqXMfARJ1DGgyNicWFwYkwTA0ip/Q8Wns=">
+<input type="hidden" name="filePath" value="/04_order-Challange_004_15343493483.pdf">
+<input type="file" name="files" class="form-control" multiple="multiple" placeholder="Order File" required="required">
+<input type="submit" id="btnSubmit" class=" tn btn-success"	value="upload the order" />
+ </form>
+ </body>
+</html>
