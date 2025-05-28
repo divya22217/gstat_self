@@ -48,8 +48,6 @@ function get_order_detail($db,$filing_no){
     return $data;
 }
 
-
-
 $auto_manual = htmlspecialchars($_REQUEST['auto_manual']);
 
 $form_status = htmlspecialchars($_REQUEST['form_status']);
@@ -102,6 +100,8 @@ $main_id=$_SESSION['main_id'];
 $schemas=htmlspecialchars($_SESSION['schema_name']);
 $username = $_SESSION['actual_username'];
 $userid=$_SESSION['id'];
+$user_court = $_SESSION['user_court'];
+ $schema_id=$_SESSION['schema_idccc'];
 $report_party_type = htmlspecialchars($_REQUEST['report_party_type']);
 if($_SESSION['user'] == '' and $_SESSION['location'] =='')
 {
@@ -445,6 +445,41 @@ $save_fn=$db->prepare("insert into $schemas.case_no_generation (filing_no) value
 $save_fn->bindParam(1, $filing_no, PDO::PARAM_STR);
 $save_fn->execute();
 
+//-------------------------Instant Notification ------------------------
+$menu_access_code=6;
+$user=getUser($db,$schema_id,$user_court,$menu_access_code);
+$receiver_id=$user['id'];
+$bench_data = get_bench_name($db,$location_access);
+$bench_name = $bench_data['city_name'];
+$username=ucfirst($username);
+$message='Re Scrutiny has been done by '.$username.' for  Appeal no:- '.$filing_no.' at  '.$bench_name.'  Bench,Please proceed with Case generation.';
+$sender_id =0;
+$type="Notification";
+$category="Case No Generation";
+$sql = "INSERT INTO notifications
+		(receiver_id,sender_id, filing_no, schema_id,type,category,message,court_id) 
+		VALUES 
+		(?,?,?,?,?,?,?)";
+
+try {
+	$stmt = $db->prepare($sql);
+	$stmt->bindParam(1, $receiver_id, PDO::PARAM_INT);
+	$stmt->bindParam(2, $sender_id, PDO::PARAM_INT);
+	$stmt->bindParam(3, $filing_no, PDO::PARAM_STR);
+	$stmt->bindParam(4, $schema_id, PDO::PARAM_INT);
+	$stmt->bindParam(5, $type, PDO::PARAM_STR);
+	$stmt->bindParam(6, $category,PDO::PARAM_STR);
+	$stmt->bindParam(7, $message, PDO::PARAM_STR);
+	$stmt->bindParam(8, $user_court, PDO::PARAM_INT);
+	$stmt->execute();
+
+} catch (PDOException $e) {
+   
+	return false;
+}
+//-------------------------End Instant Notification------------------------
+
+
 	
 $db->commit();
 
@@ -490,7 +525,7 @@ if($searchby == '1')  //not clear abcc
 
 	if($form_status == "F"){
         try{
-        	$s3Service = new S3Service();
+
         	$st1=$db->prepare("select scrutiny_count from  e_case_detail where filing_no =? ");
 			$st1->bindParam(1, $filing_no, PDO::PARAM_STR);
 			$st1->execute();
@@ -498,16 +533,13 @@ if($searchby == '1')  //not clear abcc
 
         	$db->beginTransaction();
 			//get case type
-		$st1=$db->prepare("select case_type_nclat,boofficefound,supply_disputed_questions,refile_count,allow_refiling,rejected_from_scrutiny,scrutiny_count from  e_case_detail where filing_no =?");
+		$st1=$db->prepare("select case_type_nclat,boofficefound as case_type from  e_case_detail where filing_no =? ");
 		$st1->bindParam(1, $filing_no, PDO::PARAM_STR);
 		$st1->execute();
 		$filed_detail= $st1->fetch();
 		$case_type=$filed_detail['case_type_nclat'];
 		$boofficefound=$filed_detail['boofficefound'];
 		$docs_defect = (isset($_POST['docs']))?implode(',', $_POST['docs']):null;
-		$user_scrutiny_count = $filed_detail['scrutiny_count'];
-		$refile_count = $filed_detail['refile_count'];
-		$supply_disputed_questions = $filed_detail['supply_disputed_questions'];
 
 		//echo "<pre>"; print_r($docs_defect);
 
@@ -552,16 +584,10 @@ if($searchby == '1')  //not clear abcc
 				$code11=htmlspecialchars(addslashes($code11));
 				$status1=htmlspecialchars(addslashes($status1));
 				
-				
-				
-		
-		
-
-				
+			
 	$ll='2';
 	$mis_ref='0';
 
-	
 			   $adddef_sql1 =$db->prepare("update $schemas.objection_details set comment_registrar=?,userid=?,entry_date=now(),status_registrar=?,objection_sub_code=?,level_level=?,scrutiny_correction=?, completion_date = now() where filing_no=? and objection_code=? and miscellaneous_ref_no=? and form_type IS NULL");
 	
 			  $adddef_sql1->execute(array($comment1,$sessionUserType,$status1,$aa,$ll,$scrutiny_corr1,$filing_no,$code11,$mis_ref));	   		 
@@ -601,6 +627,8 @@ $st13=$db->prepare("insert into  $schemas.scrutiny_his (filing_no,defects,notifi
 		   $st13->bindParam(4, $sessionUserType, PDO::PARAM_STR);
 		   $st13->bindParam(5, $ll, PDO::PARAM_STR);
 		   $st13->execute();
+
+
 
 
 		   //-----------------------update document_upload------------------------------------------
@@ -647,7 +675,7 @@ $allow_refiling_date = date('Y-m-d', strtotime($allow_refiling_date));
    $sccc='2';
    $reject_case_query = " ,  allow_refiling = 1, allow_refiling_date = '$allow_refiling_date' ";
    if($boofficefound == '1'){
-   	$reject_case_query = " , rejected_from_scrutiny = 1, allow_refiling = 0 ";	
+   	$reject_case_query = " , rejected_from_scrutiny = 1, allow_refiling = 0 ";
    }
 
 if(!in_array(6,$cause_no)){
@@ -671,7 +699,7 @@ $update_draft_display=$db->prepare("update $schemas.draft_objection_details set 
             $update_draft_display->bindParam(4, $filing_no, PDO::PARAM_STR);
             $update_draft_display->bindParam(5, $level_level, PDO::PARAM_STR);
             //$update_draft_display->execute();
- $no_of_days = 21;
+ $no_of_days = 7;
  $sms_type = 2;
 $listed_with_defect = 0;
  if($scrutiny_count >= 1){
@@ -682,38 +710,21 @@ $listed_with_defect = 0;
 	$check_case->execute();
 	$check_case = $check_case->fetchColumn();
 	if($check_case != '1'){
-
-		if($user_scrutiny_count == '1' && $refile_count == '1' && $supply_disputed_questions == '2'){
-			$email_text_footer = "";
-			$heading = "list with defects";
-			$up_scr=$db->prepare("update e_case_detail set allow_refiling=0, allow_refiling_date = null where filing_no = ?");
-			$up_scr->bindParam(1, $filing_no, PDO::PARAM_STR);
-			$up_scr->execute();
-		}else if($user_scrutiny_count == '1' && $refile_count == '1' && $supply_disputed_questions == '1'){
-			$email_text_footer = "";
-			$heading = "list with defects";
-			$up_scr=$db->prepare("update e_case_detail set allow_refiling=0, allow_refiling_date = null where filing_no = ?");
-			$up_scr->bindParam(1, $filing_no, PDO::PARAM_STR);
-			$up_scr->execute();
-		}else{
-
 	 	$get_case_detail = get_completed_case_detail($db,$location_access,$filing_no);
 	 	$get_case_detail = array_shift($get_case_detail);
 	 	$pet_name = get_party($db,$filing_no,$party_flag='P',$party_serial_no='1');
 		$res_name = get_party($db,$filing_no,$party_flag='R',$party_serial_no='1');
 		$case_year = date('Y');
 		$regis_date = $entry_date;
-		$extract_reg_no = substr($filing_no, 10, 6);
+		$extract_reg_no = substr($filing_no, 7, 5);
 		$extract_reg_no = 'D'.$extract_reg_no;
-		if($get_case_detail['list_with_defect'] != '1'){		
-			$save_into_case_detail = save_defective_case_detail($db,$schemas,$filing_no,$get_case_detail,$pet_name,$res_name,$case_year,$extract_reg_no,$regis_date,$userid,$location_access);
-		}
+		
+		$save_into_case_detail = save_defective_case_detail($db,$schemas,$filing_no,$get_case_detail,$pet_name,$res_name,$case_year,$extract_reg_no,$regis_date,$userid,$location_access);
 		$update_ecase_detail = update_defective_e_case_detail($db,$filing_no,$location_access);
 
 		$email_text_footer = "";
 		$heading = "list with defects";
 		$sms_type = 14;
-		}
 	}
  }
 // defective pdf and mail  start
@@ -825,7 +836,6 @@ if($listed_with_defect == '0'){
 	$cm = 0;
 	for($i=0;$i<$len;$i++)
 	{  
-		$status1=htmlspecialchars($status[$i]);
 		$code111=explode(",",$code1[$i]);
 
 		if($code111[1]=='gen')
@@ -841,19 +851,9 @@ if($listed_with_defect == '0'){
 			 $comment1 = htmlspecialchars($comment[$cm]);
 	//		  $comment1 = htmlspecialchars(addslashes($comment1));
 			  $aas='1';
-		if(trim($status1 == 'NO')){
-			if($case_type == '1'){
-				$query = "select check_list from check_list_local where id = ?";
-			}else{
-				$query = "select check_list from check_list_local_ia where id = ?";
-			}
-			$check_list=$db->prepare($query);
-			$check_list->bindParam(1, $code11, PDO::PARAM_STR);
-			$check_list->execute();
-			$check_list_point = $check_list->fetchColumn();
+		if(trim($comment1 != '')){
 		$defective_html .= '<tr style="border: 1px solid black;">
                     <td style="border: 1px solid black; padding:5px;">'.$sr.'.</td>
-                    <td style="border: 1px solid black; padding:5px;">'.$check_list_point.'.</td>
                     <td style="border: 1px solid black; padding:5px;">'.$comment1.'</td>
                 </tr>';
 		$sr++;
@@ -900,70 +900,10 @@ if($listed_with_defect == '0'){
 	// 	mkdir($upload_dir, 0777, true);
 	// }
  //  $save_apl = file_put_contents($pp_path, $outputff);
-
-  if($boofficefound == '1'){
-  	// apl 02A part B start
-	$crn_detail = get_crn_detail($db,$filing_no);
-	$crn_number = $crn_detail['crn_number'];
-	$filed_date = $crn_detail['filed_date'];
-	$order_number = $crn_detail['order_number'];
-	$e_reference_no = $crn_detail['e_reference_no'];
-
-	$pdf_html = '<div style="text-align:center;"><p>Form GST APL-02A Part B</p><p><b>Final Acknowledgement for registration of Appeal/Application</b></p><p>Your Appeal/application filed vide provisional acknowledgment reference number '.$filing_no.' dated '.date('d/m/Y',strtotime($filed_date)).' has been Case Deferred due to Wrong Jurisdiction</p></div><table style="width:100%"><tr><td><b>Date of Deferred:  '.date('d/m/Y').'</b></td><td style="text-align:right"><b>AR/JR/DR/R<br/>GSTAT: '.$bench_data['city_name'] .' Bench</b></td></tr></table>';
-
-			$dompdf2 = new Dompdf();
-	     	$time = time();				
-			$pdf_file_name=$filing_no."-apl02A-".$time;
-		  $filename=$pdf_file_name.".pdf";
-		  $filename_sms = $pdf_file_name;
-		 $dompdf2->loadHtml($pdf_html);
-		  $dompdf2->setPaper('A4');
-		  $dompdf2->render();
-		  $outputff = $dompdf2->output();
-		  $upload_dir = "Efile_Document/GSTAT_Documents/CIS_Documents/casedoc/apl02A/$filing_no";
-		  $pp_path = $upload_dir."/$filename";
-		  $save_path = $upload_dir."/$filename";
-		  if (!file_exists($save_path)) {
-				mkdir($upload_dir, 0777, true);
-			}
-		  $save_file = file_put_contents($pp_path, $outputff);
-		  $save_apl = $s3Service->uploadDynamicFile($outputff, $save_path);
-		  
-		  if(!$save_apl)
-		  {
-			$db->rollBack();
-			$message = 'There are some problem in saving apl02A part B';
-			$msg=base64_encode($filing_no);
-			$msg1=htmlspecialchars($message.'-'.$msg);
-			$hash=base64_encode($msg1);
-			$msg3=base64_encode($form_status);
-			header("Location:../index.php?hash=$hash&hash2=$msg3");
-			die;
-		  }
-		  $pdf_hash = hash_file('sha256', $pp_path);
-		$apl_form= $db->prepare("update e_case_detail set apl_02b_form_path = ?, apl_02b_accept_reject = 4, pdf_hash = ?,accepted_rejected_at = now()  where filing_no = ?");
-		$apl_form->bindParam(1, $pp_path, PDO::PARAM_STR);
-		$apl_form->bindParam(2, $pdf_hash, PDO::PARAM_STR);
-		$apl_form->bindParam(3, $filing_no, PDO::PARAM_STR);
-		$apl_form->execute();
-
-		$today_date = date('Y-m-d');
-		$doctype = 8;
-		$subdoctype = 178;
-		$docum_type = "APL02_REJECTED";
-		$party_name = "apl02";
-		$doc_level = 9;
-		$save_doc = save_document_uplaod($db,$doctype,$pp_path,$sessionUserType,$subdoctype,$e_reference_no,$filename,$docum_type,'',$filename,$filing_no,true,1,$party_name,$list_date,'A');
-		unlink($pp_path);
-		$url = "http://10.193.85.11/efiling/getdataapl02b.drt?filingNo=$filing_no&schema=$schemas";
-		callApiAsync($url);
-
-   		// apl 02A part B end
-  }
   
-  
+  $s3Service = new S3Service();
   $save_apl = $s3Service->uploadDynamicFile($outputff, $save_path);
- 
+
   if(!$save_apl)
   {
 	$db->rollBack();
@@ -1014,8 +954,6 @@ die();
 	$msg1=htmlspecialchars($message.'-'.$msg);
 	$hash=base64_encode($msg1);
 	$msg3=base64_encode($form_status);
-
-	echo $message;
 	
 	//$hash2=base64_encode($msg3);
 	
