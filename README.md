@@ -1,1 +1,0 @@
-# gstat_self
