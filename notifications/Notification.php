@@ -1,6 +1,6 @@
 <?php
-
-include('././db_inc1.php');
+session_start();
+include('../db_inc1.php');
 if ($_SESSION['user'] == '' and $_SESSION['location'] == '') {
     echo "Access Problem.....";
     header("Location: ../login.php");
@@ -25,7 +25,6 @@ if ($_SESSION['user'] == '' and $_SESSION['location'] == '') {
             case "saveReminder";
                 extract($_POST);
                $post_value=$_POST;
-             
                 $response = saveReminder($db,$post_value);
                 break;
             default:
@@ -139,84 +138,101 @@ if ($_SESSION['user'] == '' and $_SESSION['location'] == '') {
 
     function saveReminder($db,$post_value)
     {
-       
+   
         $cis_user_id=$post_value['cis_user_id'];
         $court_id=$post_value['court'];
         $schema_id=$post_value['schema_id'];
         $schema=$post_value['schemas'];
         $menu_accesscode =$post_value['menu_accesscode'];
-        $check_scrutiny_user=getcaseDetail($db,$cis_user_id,$menu_accesscode);
+        $check_scrutiny_user=getcaseDetail($db,$cis_user_id,$menu_accesscode,$schema_id,$court_id);
            
-        //print_r($check_scrutiny_user);die;
-       
-        foreach($check_scrutiny_user as $check_detail)
+      //  print_r($check_scrutiny_user);die;
+        if(isset($check_scrutiny_user) & !empty($check_scrutiny_user))
         {
-           
-            if($menu_accesscode==2)
-           {
-                if(isset($check_detail['assign_date']) & !empty($check_detail['assign_date']))
+            foreach($check_scrutiny_user as $check_detail)
+            {
+                
+                if($menu_accesscode==2)
                 {
-                    $assign_date=$check_detail['assign_date'];
+                        if(isset($check_detail['assign_date']) & !empty($check_detail['assign_date']))
+                        {
+                            $assign_date=$check_detail['assign_date'];
+                        }
+                        $message='This is the reminder that your Scrutiny task is due after 2 Days for  appeal no '.$check_detail['filing_no'];
+                        $category='Scrutiny';
+                
                 }
-                  $message='This is the reminder that your Scrutiny task is due after 2 Days for  appeal no '.$check_detail['filing_no'];
-                  $category='Scrutiny';
-           
-                }
-           elseif($menu_accesscode==11)
-           {
-                    $stmt = $db->prepare("SELECT notification_date FROM $schema.scrutiny WHERE filing_no = :filing_no");
-                    $stmt->bindParam(':filing_no', $check_detail['filing_no'], PDO::PARAM_STR); // or PARAM_INT if it's an integer
-                    $stmt->execute();
-                    $scrutiny = $stmt->fetch(PDO::FETCH_ASSOC);  
-            
-                if(isset($scrutiny['notification_date']) & !empty($scrutiny['notification_date']))
+                elseif($menu_accesscode==11)
                 {
-                    $assign_date=$check_detail['notification_date'];
+                            $stmt = $db->prepare("SELECT notification_date FROM $schema.scrutiny WHERE filing_no = :filing_no");
+                            $stmt->bindParam(':filing_no', $check_detail['filing_no'], PDO::PARAM_STR); // or PARAM_INT if it's an integer
+                            $stmt->execute();
+                            $scrutiny = $stmt->fetch(PDO::FETCH_ASSOC);  
+                    
+                        if(isset($scrutiny['notification_date']) & !empty($scrutiny['notification_date']))
+                        {
+                            $assign_date=$check_detail['notification_date'];
+                        }
+                        $message='This is the reminder that your Re-Scrutiny task is due after 2 Days for  appeal no '.$check_detail['filing_no'];
+                        $category='Scrutiny';
                 }
-                  $message='This is the reminder that your Re-Scrutiny task is due after 2 Days for  appeal no '.$check_detail['filing_no'];
-                  $category='Scrutiny';
-           }
-            elseif($menu_accesscode==6)
-           {
-                    $stmt = $db->prepare("SELECT entry_date FROM $schema.case_no_generation WHERE filing_no = :filing_no");
-                    $stmt->bindParam(':filing_no', $check_detail['filing_no'], PDO::PARAM_STR); // or PARAM_INT if it's an integer
-                    $stmt->execute();
-                    $scrutiny = $stmt->fetch(PDO::FETCH_ASSOC);  
-    
-                if(isset($scrutiny['entry_date']) & !empty($scrutiny['entry_date']))
+                    elseif($menu_accesscode==6)
                 {
-                    $assign_date=$check_detail['entry_date'];
+                            $stmt = $db->prepare("SELECT entry_date FROM $schema.case_no_generation WHERE filing_no = :filing_no");
+                            $stmt->bindParam(':filing_no', $check_detail['filing_no'], PDO::PARAM_STR); // or PARAM_INT if it's an integer
+                            $stmt->execute();
+                            $scrutiny = $stmt->fetch(PDO::FETCH_ASSOC);  
+            
+                        if(isset($scrutiny['entry_date']) & !empty($scrutiny['entry_date']))
+                        {
+                            $assign_date=$check_detail['entry_date'];
+                        }
+                        $message='This is the reminder that Case No generation task is due after 2 Days for  appeal no '.$check_detail['filing_no'];
+                        $category='Case No Generation';
                 }
-                  $message='This is the reminder that Case No generation task is due after 2 Days for  appeal no '.$check_detail['filing_no'];
-                   $message='Case No generation task is Escalated over  from Registrar for  appeal no '.$check_detail['filing_no'];
-                  $category='Case No Generation';
-           }
-           
-            
-           $reminderDate= getDuedate($db,$assign_date);
-           $today = new DateTime();
-           $currentDate = clone $today;
+                
+                    
+                    $reminderDate= getDuedate($db,$assign_date);
+                    $today = new DateTime();
+                    $currentDate = clone $today;
 
-           $reminderDate = new DateTime('2025-05-28'); // example reminder date
-            $reminderDate->modify('+2 day'); // adds 2 days
-            $currentDate = new DateTime(); // today's date
+                    $reminderDate = new DateTime($reminderDate); // example reminder date
+                    $reminderDate->modify('+2 day'); // adds 2 days
+                   
+                    $interval = $currentDate->diff($reminderDate);
 
-            $interval = $currentDate->diff($reminderDate);
-            echo $interval->format('%R%a days'); die; // shows the difference in days with +/-
+                    
+                    $lastDate= $interval->format('%R%a days');  // shows the difference in days with +/-
+                    if($reminderDate->modify('Y-m-d') == $currentDate->format('Y-m-d')) 
+                    {
 
-
-          
-            if($reminderDate == $currentDate->format('Y-m-d')) {
-
-                saveNotification($db,$cis_user_id,0,$check_detail['filing_no'],$schema_id,$court_id,'Reminder',$category,$message);
-             }
-              
-             if ($reminderDate->modify('+2 day')->format('Y-m-d') < $currentDate->format('Y-m-d')) {
-        
-                saveNotification($db,$cis_user_id,0,$check_detail['filing_no'],$schema_id,$court_id,'Escalation',$category,$message);
-             }
-            
+                        saveNotification($db,$cis_user_id,0,$check_detail['filing_no'],$schema_id,$court_id,'Reminder',$category,$message);
+                    }
+                    
+                    if ($reminderDate->modify('+2 day')->format('Y-m-d') < $currentDate->format('Y-m-d'))
+                    {
+                         switch ($menu_accesscode) {
+                            case 2:
+                                  $message='The Scrutiny task for appeal no. '.$check_detail['filing_no'].' has been escalated and is overdue, pending with the Scrutiny Reporter for the past '.$lastDate.' days';
+                                break;
+                            case 11:
+                                $message='The case number generation task for appeal no. '.$check_detail['filing_no'].' has been escalated and is overdue, pending with the AR  for the past '.$lastDate.' days';
+                                break;
+                            case 6;
+                                $message='The case number generation task for appeal no. '.$check_detail['filing_no'].' has been escalated and is overdue, pending with the Registrar for the past '.$lastDate.' days';
+                                break;
+                            default:
+                                break;
+                        }
+                        saveNotification($db,$cis_user_id,0,$check_detail['filing_no'],$schema_id,$court_id,'Escalation',$category,$message);
+                    }
+                    
+            }
         }
+        else{
+            echo "error";die;
+        }
+    
       
 
     }
@@ -280,7 +296,33 @@ if ($_SESSION['user'] == '' and $_SESSION['location'] == '') {
 
 
     function saveNotification($db,$receiver_id, $sender_id,$filing_no, $schema_id,$court_id, $type,$category, $message)
-    {
+    {   
+        
+        if($type="Escalation" & !empty($escalated_data))
+        {
+             $sql = "UPDATE  notifications set message=? ,status=? where  type=?
+                ";
+            //  ON CONFLICT (filing_no, type, receiver_id) DO NOTHING";
+
+        try {
+            $stmt = $db->prepare($sql);
+            $stmt->bindParam(1, $receiver_id, PDO::PARAM_INT);
+            $stmt->bindParam(2, $sender_id, PDO::PARAM_INT);
+            $stmt->bindParam(3, $filing_no, PDO::PARAM_STR);
+            $stmt->bindParam(4, $schema_id, PDO::PARAM_INT);
+            $stmt->bindParam(5, $type, PDO::PARAM_STR);
+            $stmt->bindParam(6, $category,PDO::PARAM_STR);
+            $stmt->bindParam(7, $message, PDO::PARAM_STR);
+            $stmt->bindParam(8, $court_id, PDO::PARAM_INT);
+            $stmt->execute();
+           // print_r($run);die;
+            return true;
+        } catch (PDOException $e) {
+            echo "Error inserting notification: " . $e->getMessage();
+            return false;
+        }
+        }
+        else{
         $sql = "INSERT INTO notifications
                 (receiver_id,sender_id, filing_no, schema_id,type,message,court_id) 
                 VALUES 
@@ -304,10 +346,12 @@ if ($_SESSION['user'] == '' and $_SESSION['location'] == '') {
             echo "Error inserting notification: " . $e->getMessage();
             return false;
         }
+     }
+    
     }
 
    
-    function getcaseDetail($db,$cis_user_id,$menu_accesscode)
+    function getcaseDetail($db,$cis_user_id,$menu_accesscode,$location_id,$court_id)
     {
      
         $query_q = "SELECT ecd.filing_no,ecd.scrutiny,ecd.scrutiny_level,ecd.scrutiny_assign_date as assign_date
@@ -315,24 +359,31 @@ if ($_SESSION['user'] == '' and $_SESSION['location'] == '') {
            // $condition .="WHERE cis_user_id=?  AND scrutiny='0' AND scrutiny_level= 0 ";
             if($menu_accesscode== 2)
             {
-                $query_q .= "WHERE cis_user_id=?  AND scrutiny='0' AND scrutiny_level= 0 " ;
+                $query_q .= " WHERE cis_user_id=?  AND location_id=? AND court=? AND scrutiny='0' AND scrutiny_level= 0 AND is_defective = 0  AND is_refiled = 0 " ;
             }
             if($menu_accesscode == 11)
             {
-                $query_q .= "WHERE  scrutiny='0' AND scrutiny_level= 1 " ;
+                $query_q .= " WHERE  scrutiny='0' AND location_id=? AND court=? AND scrutiny_level= 1 AND is_defective = 0  AND is_refiled = 0 " ;
                 
             }
             if($menu_accesscode == 6)
             {
-                $query_q .= "WHERE  scrutiny='1' AND scrutiny_level= 2 AND case_no_generated=0  AND is_defective = 0" ;
+                $query_q .= " WHERE scrutiny_level= 2 AND location_id=? AND court=? AND case_no_generated=0  AND is_defective = 0 AND is_refiled = 0" ;
                 
             }
-       
+      
             try {
                 $query = $db->prepare($query_q);
-                $query->bindParam(1, $cis_user_id, PDO::PARAM_INT);
+                if($menu_accesscode== 2)
+                {
+                    $query->bindParam(1, $cis_user_id, PDO::PARAM_INT);
+                }
+                $query->bindParam(1, $location_id, PDO::PARAM_INT);
+                $query->bindParam(2, $court_id, PDO::PARAM_INT);
                 $query->execute();
+                // print_r($query);die('hefgh');
                 $data = $query->fetchAll();
+               // print_r($data);die;('cd');
                 return $data;
             } catch (PDOException $ex) {
                 
