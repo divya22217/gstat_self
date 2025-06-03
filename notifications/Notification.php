@@ -302,7 +302,7 @@ if ($_SESSION['user'] == '' and $_SESSION['location'] == '') {
         {
              $sql = "UPDATE  notifications set message=? ,status=? where  type=?
                 ";
-            //  ON CONFLICT (filing_no, type, receiver_id) DO NOTHING";
+             $sql .="ON CONFLICT (filing_no, type, receiver_id) DO NOTHING";
 
         try {
             $stmt = $db->prepare($sql);
