@@ -7,6 +7,10 @@ header("Pragma: no-cache");
 header("Cache-Control=proxy-revalidate");
 date_default_timezone_set("Asia/Kolkata");
 include "../db_inc1.php";
+require "../vendor/autoload.php";
+require_once('../object_storage/S3Service.php');
+use Dompdf\Dompdf;
+$dompdf = new Dompdf();
 //ini_set('display_errors', 1);
 // ini_set('display_startup_errors', 1);
 // error_reporting(E_ALL); 
@@ -160,6 +164,31 @@ try {
             echo $ex;
             // die;
         }
+
+        //------------------------Add Representative---------------------------//
+         try {
+            $bo_data = $db_online->prepare("select name,email,mobilenumber as mobile from gst_ecase_assign_tobo_office  where filingno = '$filing_no' ");
+            $bo_data->execute();
+            $bo_arr = $bo_data->fetchAll();
+            $data_main = array_merge($bo_arr, $data_main);
+        } catch (PDOException $ex) {
+            echo $ex;
+            // die;
+        }
+        try {
+            $nodal_data = $db_online->prepare("select b.rep_name as name,b.email,b.mobile,a.party_flag from e_more_representative_gst_nodal as a
+        left join e_master_advocate as b ON  b.id = a.rep_code
+        where filing_no = '$filing_no' and a.rep_code != '0'
+        order by a.id asc");
+            $nodal_data->execute();
+            $nodal_arr = $nodal_data->fetchAll();
+            $data_main = array_merge($nodal_arr, $data_main);
+        } catch (PDOException $ex) {
+            echo $ex;
+            // die;
+        }
+        //-----------------------------Representative----------------------//
+       
         $cur_date = date('Y-m-d');
 
        // $link = '';
@@ -175,9 +204,9 @@ try {
                 $name = $val['name'];
                 $party_flag = $val['party_flag'];
                 $query = "insert into sms(filing_no,mobile,mobile_msg,email_id,email_subject,email_text,
-                name,sms_flag,send_flag,entry_date,sms_type,party_flag)
+                name,sms_flag,send_flag,entry_date,sms_type,party_flag,pdf_path)
                 VALUES('$filing_no','$mobile','$mobile_msg','$email_id','$email_subject',
-                '$email_text','$name','N',0,'$cur_date','$type','$party_flag')";
+                '$email_text','$name','N',0,'$cur_date','$type','$party_flag',$notice_pdf)";
                 try {
                     $sql_query = $db_online->prepare($query);
                     $sql_query->execute();
@@ -1463,10 +1492,32 @@ if ($_SESSION['user'] != '' and $_SESSION['location'] != '') {
             $file_name_dat = $file_name . '.pdf';
             $data_notice = summon_formate($db, $to_party_id, $_REQUEST['notice_type'], $schema, $arra_data);
             $html_pdf = $data_notice['notice_html'];
+            //---------Notice PDF creation---------------//
+            try{
+             $dompdf->loadHtml($html_pdf);
+			  $dompdf->setPaper('A4');
+			  $dompdf->render();
+			  $outputff = $dompdf->output();
+			  $upload_dir = "/Efile_Document/GSTAT_Documents/CIS_Documents/casedoc/notice/".$_POST['notice_type'];
+			  $pp_path = $upload_dir."/$file_name_dat";
+			  $save_path = $upload_dir."/$file_name_dat";
+			  if (!file_exists($save_path)) {
+					mkdir($upload_dir, 0777, true);
+	                   	}
+			 $save_file = file_put_contents($pp_path, $outputff);
+			  
+			  $s3Service = new S3Service();
+			  $s3Service->uploadDynamicFile($outputff, $save_path);
+            }catch (PDOException $e) {
+                error_log("Error generating or uploading PDF: " . $e->getMessage());
+                echo $msg = '>Error in generating or uploading PDF' . $e; die;
+            }
+
+            //----------Notice PDF creation--------------//
             $before_bench = (!empty($data_notice['coram']))?$data_notice['coram']:'';
             $listing_date = (!empty($data_notice['listing_date']))?$data_notice['listing_date']:null;
             $blank = '';
-            $query = "INSERT INTO $schema.notice_creation_details (sr_no_notice,sr_no,sr_no_year,notice_html,file_name,type_formate,filing_no, case_no, case_type, case_year, location,send_date, notice_type, notice_date, today_date, user_id, to_party_id, seal_of_court_date,whereason_date,written_statement_date,appear_court_date,petion_againts_desc,before_bench,listing_date,compilence,ask_document_person,time_to_present,name_of_documents,notice_html_data) values
+            $query = "INSERT INTO $schema.notice_creation_details (sr_no_notice,sr_no,sr_no_year,notice_html,file_name,type_formate,filing_no, case_no, case_type, case_year, location,send_date, notice_type, notice_date, today_date, user_id, to_party_id, seal_of_court_date,whereason_date,written_statement_date,appear_court_date,petion_againts_desc,before_bench,listing_date,compilence,ask_document_person,time_to_present,name_of_documents,notice_html_data,pdf_path) values
             (?,?,?,?,?,?,?,?,?,?,?,now(),?,now(),now(),?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
             try {
@@ -1498,6 +1549,7 @@ if ($_SESSION['user'] != '' and $_SESSION['location'] != '') {
                 $query_insert->bindParam(24,$time_to_present,PDO::PARAM_STR);
                 $query_insert->bindParam(25,$name_of_documents,PDO::PARAM_STR);
                 $query_insert->bindParam(26,$notice_html_data,PDO::PARAM_STR);
+                $query_insert->bindParam(27,$save_path,PDO::PARAM_STR);
                 if ($query_insert->execute() == '1') {
 
                     $subject = "Notice Sr. No. :" . $sr_no_noticeqqq;
