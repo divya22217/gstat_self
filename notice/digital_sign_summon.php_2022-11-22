@@ -1,0 +1,224 @@
+<?php
+header("Cache-Control: private");
+header("Cache-Control: no-cache, no-store, must-revalidate");
+header("Pragma: no-cache");
+header("Cache-Control=proxy-revalidate");
+date_default_timezone_set("Asia/Kolkata");
+ob_start();
+include("../db_inc1.php");
+session_start();
+$_SESSION['user'];
+$_SESSION['location'];
+$schemas = htmlspecialchars($_SESSION['schema_name']);
+$userid = $_SESSION['id'];
+if ($_SESSION['user'] == '' and $_SESSION['location'] == '') {
+    echo "Access Problem.....";
+    header("Location: ../login.php");
+    die();
+}
+setcookie("PHPSESSID", "", time() - 3600, "", "", TRUE, TRUE);
+if ($_SESSION['user'] != '' and $_SESSION['location'] != '') {
+
+
+    function get_data($db, $table_name, $where = array(), $where_like = array(), $column = '*', $order_by = null, $order_column = null, $limit = null)
+    {
+        $data_main = array();
+        $where_as = '';
+        $where_con_like = '';
+        if (is_array($where) && !empty($where)) {
+            foreach ($where as $key => $val) {
+                if ($key != '' && $val != '') {
+                    $where_as .= $key . '=' . "'$val'" . ' and ';
+                }
+            }
+            $where_as = rtrim($where_as, ' and ');
+            $where_con = '';
+            if ($where_as != '') {
+                $where_con = 'where ' . $where_as;
+            }
+        }
+        $where_as_like = '';
+        if (is_array($where_like) && !empty($where_like)) {
+            foreach ($where_like as $key1 => $val1) {
+                if ($key1 != '' && $val1 != '') {
+                    $where_as_like .= $key1 . ' LIKE ' . "'%$val1'" . ' and ';
+                }
+            }
+            $where_as_like = rtrim($where_as_like, ' and ');
+            $where_con_like = '';
+            if ($where_as_like != '') {
+                $where_con_like = ' and ' . $where_as_like;
+            }
+        }
+        $where_con = $where_con . $where_con_like;
+
+        $order_by_con = '';
+        if ($order_by != null) {
+            $order_by_con = 'ORDER BY ' . $order_column . ' ' . $order_by;
+        }
+        $limit_con = '';
+        if ($limit != '') {
+            $limit_con = $limit;
+        }
+        $query = "select $column from $table_name $where_con $order_by_con $limit_con";
+        $query_prepare = $db->prepare($query);
+        $query_prepare->execute();
+        $i = 0;
+        while ($row = $query_prepare->fetch(PDO::FETCH_ASSOC, PDO::FETCH_ORI_NEXT)) {
+            $data_main[] = $row;
+        }
+        return $data_main;
+    }
+
+
+    ?>
+    <?php
+    include '../inheader.php';
+    include '../sidebar.php';
+    ?>
+    <script type="text/javascript" src="../js/jquery.validate.min.js"></script>
+    <style>
+        .content-wrapper {
+            padding: 15px 35px;
+        }
+
+        .load_container {
+            background: rgba(0, 0, 0, 0.50);
+            width: 100%;
+            height: 100%;
+            position: fixed;
+            top: 0;
+            z-index: 99;
+            left: 0;
+            display: none;
+        }
+
+        .load_container .loader {
+            display: block;
+            width: 60px;
+            height: 60px;
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+
+        .error {
+            color: red;
+        }
+
+    </style>
+    <div class="load_container">
+        <img class="loader" src="images/loading-indicator.gif">
+    </div>
+    <div class="content-wrapper">
+        <div class="row" style="">
+            <div class="box box-success">
+                <div class="box-body">
+                    <section class="content-header">
+                        <h1>Upload Digitally Signed Summon / Notice</h1>
+                        <ol class="breadcrumb">
+                            <li><a href="index.php"><i class="fa fa-dashboard"></i> HOME</a></li>
+                            <li><a href="digital_sign_summon.php">Upload Digitally Signed Summon / Notice</a></li>
+                        </ol>
+                    </section>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="box box-success">
+                <div class="box-body">
+                    <form method="post" id="digital_sign_file_form_id" enctype="multipart/form-data">
+                        <div class="modal-body with-padding">
+                            <div class="form-group">
+                                <div class="row">
+                                    <div class="col-sm-6">
+                                        <label>Select Search BY :</label>
+                                        <select required="required" class="form-control" name="filing_no"
+                                                id="filing_no">
+                                            <option value="">Select Filing No / Title</option>
+                                            <?php
+                                            $query = "select * from $schemas.notice_creation_details where file_name != '' and digital_sign_status is null   order by id asc";
+                                            $query_prepare = $db->prepare($query);
+                                            $query_prepare->execute();
+                                            $i = 0;
+
+
+                                            while ($row = $query_prepare->fetch(PDO::FETCH_ASSOC, PDO::FETCH_ORI_NEXT)) {
+                                                $notice_type = $row['notice_type'];
+                                                $notice = 'Summon';
+                                                if ($notice_type == '3') {
+                                                    $notice = 'Notice';
+                                                }
+
+                                                $data = get_data($db, $schemas . '.case_detail', array('filing_no' => $row["filing_no"]));
+                                                echo '<option value=' . $row["id"] . '>' . $row["filing_no"] . ' (' . $data[0]['pet_name'] . '  VS  ' . $data[0]['res_name'] . ') ' . $notice . '</option>';
+                                            }
+                                            ?>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <div class="row">
+                                    <div class="col-sm-6">
+                                        <label>Upload Digitally Signed PDF:</label>
+                                        <input required="required" type="file" class="form-control" name="file_upload"
+                                               id="file_upload">
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="reset" class="btn btn-warning" data-dismiss="modal">Cancel</button>
+                            <button type="submit" name="form_data" class="btn btn-primary">
+                                Submit
+                            </button>
+                        </div>
+
+                    </form>
+
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../dist/js/adminlte.min.js"></script>
+    <script src="../bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <link rel="stylesheet" href="/resources/demos/style.css">
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+
+    <script>
+        $("#digital_sign_file_form_id").on('submit', function (e) {
+            e.preventDefault();
+            var valid = $("#digital_sign_file_form_id").valid();
+            if (valid) {
+                $.ajax({
+                    type: 'POST',
+                    url: 'submit.php',
+                    data: new FormData(this),
+                    contentType: false,
+                    cache: false,
+                    processData: false,
+                    success: function (msg) {
+                        alert(msg);
+                        document.getElementById("digital_sign_file_form_id").reset();
+                       location.reload(true);		
+                    },
+                    error: function (request, error) {
+                        alert("something error tetetet. please try again");
+                    }
+                });
+
+            }
+        });
+
+
+    </script>
+
+
+<?php } ?>
+
+
+

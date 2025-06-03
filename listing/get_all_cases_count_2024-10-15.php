@@ -1,0 +1,81 @@
+<?php 
+include("../db_inc1.php");
+ /* ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);  */  
+$data = $_REQUEST;
+	$type = $data['type'];
+	$schemas=htmlspecialchars($_SESSION['schema_name']);
+	$location_code = $_SESSION['location'];
+	$user_court = $_SESSION['user_court'];
+	if($type == 'by_court_and_listing_date' || $type == 'reset_cases'){
+		$listing_date = $data['listing_date'];
+		$court_no = $data['court_no'];
+		/* if($listing_date == '' || $court_no == ''){
+			echo "<tr><td colspan='8'> please select Court number and enter listing date</td></tr>";
+			die;
+		} */
+		$count = 0;
+		if(isset($listing_date) && !empty($listing_date)){
+		list($day,$month,$year)=explode('/',$listing_date);
+		$court_date_new=$year.'-'.$month.'-'.$day;
+		}else{
+			$court_date_new = '';
+		}
+		$additional_query = '';
+		if($court_no != '' && ($court_date_new != '' )){
+			$additional_query = " and s.first_listing_date = '$court_date_new' and s.first_court_no = '$court_no'";
+		}
+		if($court_no != '' && $court_date_new == '' ){
+			$additional_query = " and s.first_court_no = '$court_no'";
+		}
+		if($court_no == '' && $court_date_new != '' ){
+			$additional_query = " and s.first_listing_date = '$court_date_new'";
+		}
+		
+		$query = "select count(*) as count from $schemas.case_detail as a inner join $schemas.scrutiny as s on s.filing_no = a.filing_no
+					inner join e_case_detail as ecd on ecd.filing_no = a.filing_no
+					where (a.case_no is NOT NULL OR a.case_no != '') and (a.case_year is NOT NULL OR a.case_year != '') and (a.case_type is NOT NULL  and a.case_type != 60) and 
+					(a.location_code is NOT NULL) and  (a.legal_aid IS NULL OR a.legal_aid = 'NULL') and a.status = 'P' $additional_query and ecd.court = $user_court";
+		//echo $query;
+		$sql1=$db->prepare($query);
+		$sql1->execute();
+		$res = $sql1->fetchColumn();
+	}	
+	
+	if($type == 'all_cases'){
+		$count = 0;
+		$query = "select count(*) as count from $schemas.case_detail as a left join $schemas.scrutiny as s on s.filing_no = a.filing_no
+					inner join e_case_detail as ecd on ecd.filing_no = a.filing_no
+					where (a.case_no is NOT NULL OR a.case_no != '') and (a.case_year is NOT NULL OR a.case_year != '') and (a.case_type is NOT NULL  and a.case_type != 60) and 
+					(a.location_code is NOT NULL) and  (a.legal_aid IS NULL OR a.legal_aid = 'NULL') and a.status = 'P'  and ecd.court = $user_court";
+		//echo $query;
+		$sql1=$db->prepare($query);
+		$sql1->execute();
+		$res = $sql1->fetchColumn();
+		
+	}
+	
+	if($type == 'case_no_search'){
+		$search_case_no = $data['search_case_no'];
+		$search_case_type = $data['search_case_type'];
+		$search_case_year = $data['search_case_year'];
+		$count = 0;
+		$query = "select count(*) as count from $schemas.case_detail as a left join $schemas.scrutiny as s on s.filing_no = a.filing_no
+					left join e_case_detail as ecd on ecd.filing_no = a.filing_no
+					where (a.case_no is NOT NULL OR a.case_no != '') and (a.case_year is NOT NULL OR a.case_year != '') and (a.case_type is NOT NULL  and a.case_type != 60) and 
+					(a.location_code is NOT NULL) and  (a.legal_aid IS NULL OR a.legal_aid = 'NULL') and a.status = 'P' and a.case_type = ? and a.case_year = ? and a.case_no = ? and a.location_code = ? and ecd.court = ?";
+		
+		$sql1=$db->prepare($query);
+		$sql1->bindParam(1, $search_case_type, PDO::PARAM_INT);
+		$sql1->bindParam(2, $search_case_year, PDO::PARAM_STR);
+		$sql1->bindParam(3, $search_case_no, PDO::PARAM_STR);
+		$sql1->bindParam(4, $location_code, PDO::PARAM_STR);
+		$sql1->bindParam(5, $user_court, PDO::PARAM_INT);
+		$sql1->execute();
+		$res = $sql1->fetchColumn();
+	}
+	
+	echo $res; die;
+	
+?>

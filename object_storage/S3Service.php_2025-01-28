@@ -1,0 +1,98 @@
+<?php
+
+// Include the Composer autoloader
+require 'vendor/autoload.php';
+
+use Aws\S3\S3Client;
+use Aws\Exception\AwsException;
+
+class S3Service
+{
+    private $s3Client;
+    private $bucketName = 'Object-UAT'; // Fixed bucket name
+
+    public function __construct()
+    {
+        // Initialize the S3 client with your credentials
+        $this->s3Client = new S3Client([
+            'region' => 'INDIA',  // Region for Mumbai (India)
+            'version' => 'latest', // Use the latest version of the API
+            'credentials' => [
+                'key'    => '56f55cde1c45468c9128e011df03ff23',
+                'secret' => '73e7fe4f4e404b938a2c497574e7ef07',
+            ],
+            'endpoint' => 'https://10.193.41.10:13808', // HTTPS endpoint for your S3-compatible service
+            'use_path_style_endpoint' => true, // Enable path-style endpoints for S3-compatible storage
+            'http' => [
+                'verify' => false, // Path to the custom CA certificate
+                'timeout' => 120, // Timeout for the request
+                'connect_timeout' => 60, // Timeout for the connection
+            ],
+            'debug' => true, // Enable debug mode
+        ]);
+    }
+
+    /**
+     * Uploads a file to the S3 bucket.
+     *
+     * @param string $filePath Local path to the file.
+     * @param string $key S3 key (path + file name).
+     * @return string|null URL of the uploaded file or null on failure.
+     */
+    public function uploadFile($filePath, $key)
+    {
+        try {
+            $result = $this->s3Client->putObject([
+                'Bucket' => $this->bucketName,
+                'Key'    => $key,
+                'SourceFile' => $filePath,
+                'ACL'    => 'public-read', // Adjust this according to your requirements
+            ]);
+
+            return $result['ObjectURL'];
+        } catch (AwsException $e) {
+            echo "Error uploading file: " . $e->getMessage();
+            return null;
+        }
+    }
+
+    /**
+     * Retrieves a file URL from the S3 bucket.
+     *
+     * @param string $key S3 key (path + file name).
+     * @return string|null URL of the file or null if not found.
+     */
+    public function getFile($key)
+    {
+        try {
+            $result = $this->s3Client->getObjectUrl($this->bucketName, $key);
+            return $result;
+        } catch (AwsException $e) {
+            echo "Error retrieving file: " . $e->getMessage();
+            return null;
+        }
+    }
+}
+
+// Main file
+
+// Instantiate the S3Service (bucket name is fixed inside the class)
+$s3Service = new S3Service();
+
+// Upload a file
+$filePath = 'testfile.pdf'; // Local file path
+$s3Key = 'upload/testfile.pdf'; // S3 key (path + file name)
+$fileUrl = $s3Service->uploadFile($filePath, $s3Key);
+
+if ($fileUrl) {
+	//    echo "File uploaded successfully. File URL: " . $fileUrl . PHP_EOL;
+	echo "File uploaded successfully. File URL: ";
+}
+
+// Retrieve the file URL
+$retrievedFileUrl = $s3Service->getFile($s3Key);
+
+if ($retrievedFileUrl) {
+	//    echo "File retrieved successfully. File URL: " . $retrievedFileUrl . PHP_EOL;
+	echo "File retrieved successfully. File URL: ";
+}

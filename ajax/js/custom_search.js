@@ -1,0 +1,197 @@
+
+function fn_case_dfr_type(value) {
+    $("#case_dfr_div_id").empty();
+    $('.load_container').show();
+
+    $("#listing_case_detaisl").hide();
+    $("#view_case_type_details").empty(data);
+    var data = {};
+    data['action'] = 'select_case_status';
+    data['search_by'] = value;
+	data['schema_name'] = $("#location").val();
+    $.ajax({
+        type: "POST",
+        url: "ajax/ajax.php",
+        data: data,
+        dataType: "html",
+        success: function (data) {
+            $("#case_dfr_div_id").html(data);
+            $('.load_container').hide();
+        },
+        error: function (request, error) {
+            alert("something error. please try again");
+        }
+    });
+}
+
+function fn_search_by_case_dfr() {
+    var valid = $("#form_id_case_status").valid();
+   // $("#listing_case_detaisl").show();
+    if (valid) {
+        $('.load_container').show();
+        var data = {};
+        data['action'] = 'case_status_search';
+        data['search_by'] = $("#form_id_case_status #search_by").val();
+        data['case_type'] = $("#form_id_case_status #case_type").val();
+        data['case_number'] = $("#form_id_case_status #case_number").val();
+        data['status_search'] = $("#form_id_case_status #select_status").val();
+
+
+        data['select_judge'] = $("#form_id_case_status #select_judge").val();
+        data['from_date'] = $("#form_id_case_status #from_date").val();
+        data['to_date'] = $("#form_id_case_status #to_date").val();
+
+
+        data['case_year'] = $("#form_id_case_status #case_year").val();
+        data['diary_no'] = $("#form_id_case_status #diary_no").val();
+        data['party_name'] = $("#form_id_case_status #party_name").val();
+        data['advocate_name'] = $("#form_id_case_status #advocate_name").val();
+        data['select_party'] =  $("#form_id_case_status #select_party").val();
+  data['answer'] =  $("#form_id_case_status #answer").val();
+        data['crn_no']=  $("#form_id_case_status #crn_no").val();
+        data['schema_name'] = $("#location").val();
+        $.ajax({
+            type: "POST",
+            url: "ajax/ajax.php",
+            data: data,
+            dataType: "html",
+            success: function (data) {
+                $('.load_container').hide();
+                $("#listing_case_detaisl").show();
+                $("#view_case_type_details").html(data);
+
+ var elmnt = document.getElementById("listing_case_detaisl");
+             elmnt.scrollIntoView();
+
+            },
+            error: function (request, error) {
+                alert("something error");
+                $('.load_container').hide();
+            }
+        });
+    }
+}
+function fn_case_details(filing_no) {
+    $('.load_container').show();
+    var data = {};
+    data['action'] = 'case_status_case_details';
+    data['filing_no'] = filing_no;
+	data['schema_name'] = $("#location").val();
+    $.ajax({
+        type: "POST",
+        url: "ajax/ajax.php",
+        data: data,
+        dataType: "html",
+        success: function (data) {
+            $('.load_container').hide();
+            $("#div_case_details_popup").html(data);
+        },
+        error: function (request, error) {
+            alert("something error");
+            $('.load_container').hide();
+        }
+    });
+    $("#case_details_popup").modal('show');
+}
+
+function fn_case_details_hearing(filing_no,listing_date) {
+    $('.load_container').show();
+    var data = {};
+    data['action'] = 'case_status_case_details_hearing';
+    data['filing_no'] = filing_no;
+    data['listing_date'] = listing_date;
+	data['schema_name'] = $("#location").val();
+    $.ajax({
+        type: "POST",
+        url: "ajax/ajax.php",
+        data: data,
+        dataType: "html",
+        success: function (data) {
+            $('.load_container').hide();
+            $("#div_case_details_popup_hearing").html(data);
+        },
+        error: function (request, error) {
+            alert("something error");
+            $('.load_container').hide();
+        }
+    });
+    $("#case_details_popup_hearing").modal('show');
+}
+
+function get_case_years(case_type){
+	$('.load_container').show();
+    var data = {};
+    data['action'] = 'show_case_years';
+    data['case_type'] = case_type;
+    $.ajax({
+        type: "POST",
+        url: "ajax/ajax.php",
+        data: data,
+        dataType: "html",
+        success: function (data) {
+            $('.load_container').hide();
+            $("#case_year").html(data);
+        },
+        error: function (request, error) {
+            alert("something error");
+            $('.load_container').hide();
+        }
+    });
+    
+}
+
+function get_court(schema){
+    $('.load_container').show();
+    var data = {};
+    data['action'] = 'courts';
+    data['schema_name'] = schema;
+    $.ajax({
+        type: "POST",
+        url: "ajax/ajax.php",
+        data: data,
+        dataType: "html",
+        success: function (data) {
+            $('.load_container').hide();
+            $("#bench_court").html(data);
+        },
+        error: function (request, error) {
+            alert("something error");
+            $('.load_container').hide();
+        }
+    });
+}
+
+function get_causelist(){
+
+    $("#case_dfr_div_id").empty();
+    $('.load_container').show();
+
+    $("#listing_case_detaisl").hide();
+    $("#view_case_type_details").empty(data);
+    var data = {};
+    if($("#listing_date").val() === ''){
+        alert("please fill listing date");
+        $('.load_container').hide();
+        return false;
+    }
+    data['listing_date'] = $("#listing_date").val();
+    data['schema_name'] = $("#location").val();
+    data['court_no'] = $("#bench_court").val();
+    data['answer'] = $("#answer").val();
+    $.ajax({
+        type: "POST",
+        url: "public_causelist.php",
+        data: data,
+        dataType: "html",
+        success: function (data) {
+            $("#case_dfr_div_id").html(data);
+            $('.load_container').hide();
+            $(".captcha").attr("src", "captcha.php?_=" + ((new Date()).getTime()));
+        },
+        error: function (request, error) {
+            alert("something error");
+            $('.load_container').hide();
+            $(".captcha").attr("src", "captcha.php?_=" + ((new Date()).getTime()));
+        }
+    });
+}

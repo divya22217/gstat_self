@@ -1,0 +1,395 @@
+<?php
+
+ /*  ini_set('display_errors', 1);
+ ini_set('display_startup_errors', 1);
+ error_reporting(E_ALL); */
+
+// required headers
+header("Access-Control-Allow-Origin: *");
+header("Content-Type: application/json; charset=UTF-8");
+  
+// database connection will be here
+
+// include database and object files
+require_once '../config/database.php';
+require_once '../config/auth_nclat.php';
+require_once '../objects/nclat_website_case_status.php';
+require_once '../objects/nclat_website_api_functions.php';
+$auth = new AuthNclat();
+$is_auth = $auth->token_auth();
+//$is_auth = $auth->basic_auth();
+
+
+// Store the cipher method 
+$ciphering = "AES-128-CTR"; 
+  
+// Use OpenSSl Encryption method 
+$iv_length = openssl_cipher_iv_length($ciphering); 
+$options = 0; 
+// Non-NULL Initialization Vector for decryption 
+$decryption_iv = '1234567891011121'; 
+  
+// Store the decryption key 
+$decryption_key = "encrypt"; 
+
+$encryption_iv = '1234567891011121'; 
+  
+// Store the encryption key 
+$encryption_key = "encrypt"; 
+
+// instantiate database and product object
+$database = new Database();
+$db = $database->getConnection();
+$case_obj = new NclatWebsiteCaseStatus($db,$filing_no_length=16,$backlog = 0,$wrong_status = 'W',$blank = '',$pet_party_flag = 'P',$res_party_flag = 'R',$party_serial_no = 1);
+
+$global_obj = new NclatWebsiteApi($db);
+
+$search_type = isset($_REQUEST['search_type'])?$_REQUEST['search_type']:'';
+$page = isset($_REQUEST['page'])?$_REQUEST['page']:'';
+$search_by_option = isset($_REQUEST['search_by'])?$_REQUEST['search_by']:'';
+$schema = isset($_REQUEST['bench_name'])?$_REQUEST['bench_name']:'';
+$wrongly_case_status = 'W';
+
+//$search_type=openssl_decrypt ($search_type, $ciphering, $decryption_key, $options, $decryption_iv);
+
+if($search_type == 'initial' && $page != '') {
+	$response = array('status'=>1,'msg'=>'success');
+	$get_benchs = $global_obj->get_all_zone_nclat();
+	$get_case_type_master = $global_obj->get_case_types_nclat();
+    $search_by = $global_obj->search_by($page);
+    
+	$response['benches'] = $get_benchs;
+	$response['case_types'] = $get_case_type_master;
+    $response['search_by'] = $search_by;
+	http_response_code(200);
+	echo json_encode($response,true);
+	die;
+}
+// else{
+//     $response = array('status'=>0,'msg'=>'Something went wrong');
+//     http_response_code(500);
+// 	echo json_encode($response,true);
+// 	die;
+// }
+
+if($search_type == 'filters' && $page != '' && $search_by_option != '') {
+	$response = array('status'=>1,'msg'=>'success');
+	if($page == 'case_status'){
+		if($search_by_option == 'party_wise'){
+			$party_types = $global_obj->party_search();
+			$response['party_types'] = $party_types;
+		}
+		if($search_by_option == 'advocate_wise'){
+			$advocates = $global_obj->advocate_lists();
+			$response['advocates'] = $advocates;
+		}
+		if($search_by_option == 'case_type_wise'){
+			$get_case_type_master = $global_obj->get_case_types_nclat();
+			$response['case_types'] = $get_case_type_master;
+		}
+	}
+	if($page == 'judgements' || $page == 'orders' || $page == 'judgements_orders'){
+		if($search_by_option == 'free_text_wise'){
+			$free_text_search_type = $global_obj->free_text_search();
+			$response['free_text_search_type'] = $free_text_search_type;
+		}
+		if($search_by_option == 'judges_member_wise'){
+			if($schema != ''){
+				$judges =  $global_obj->get_judges($schema);
+				$categories = $global_obj->get_categories();
+			}
+			$response['judges'] = $judges;
+			$response['categories'] = $categories;
+		}
+		if($search_by_option == 'order_date_wise'){
+			if($schema != '')
+				$categories = $global_obj->get_categories();
+			$response['categories'] = $categories;
+		}
+	}
+    http_response_code(200);
+	echo json_encode($response,true);
+	die;
+
+}
+
+if(($search_type == 'get_orders' || $search_type == 'get_judgements') && $page == 'homepage'){
+	
+	$response = array('status'=>200,'msg'=>'success');
+	$homepage = $case_obj->get_homepage($db,$search_type);
+	$response['data'] = $homepage;
+	http_response_code(200);
+	echo json_encode($response,true);
+	die;
+	
+}
+
+
+if($search_type == 'get_cases'){
+	$response = array('status'=>200,'msg'=>'success');
+	if($page == 'case_status'){
+		if($search_by_option == 'filing_no_wise'){
+			$filing_no = htmlspecialchars(htmlentities($_POST['filing_no']));
+			$cases = $case_obj->get_cases_filing_no_wise($db,$schema,$filing_no);
+
+		}elseif($search_by_option == 'case_no_wise'){
+			$case_no = htmlspecialchars(htmlentities($_POST['case_no']));
+			$case_type = htmlspecialchars(htmlentities($_POST['case_type']));
+			$case_year = htmlspecialchars(htmlentities($_POST['case_year']));
+			$cases = $case_obj->get_cases_case_no_wise($db,$schema,$case_type,$case_no,$case_year);
+			
+		}elseif($search_by_option == 'case_type_wise'){
+			$case_type = htmlspecialchars(htmlentities($_POST['case_type']));
+			$case_year = htmlspecialchars(htmlentities($_POST['case_year']));
+			$case_status = htmlspecialchars(htmlentities($_POST['case_status']));
+			$cases = $case_obj->get_cases_case_type_wise($db,$schema,$case_type,$case_year,$case_status);
+		}elseif($search_by_option == 'party_wise'){
+			$party_type = htmlspecialchars(htmlentities($_POST['party_type']));
+			$party_name = htmlspecialchars(htmlentities(strtolower($_POST['party_name'])));
+			$case_year =  htmlspecialchars(htmlentities($_POST['case_year']));
+			if ($party_type == '1') {
+				$cases = $case_obj->get_cases_main_party_wise($db,$schema,$party_type,$party_name,$case_year);
+            } else if ($party_type == '2') {
+				
+                $whwre = '';
+                if ($case_year != 'All') {
+                    $whwre = " and filing_no like '%$case_year' ";
+                }
+				$query = "SELECT filing_no FROM public.e_cases_party where (filing_no != 'NA' OR filing_no is not null) and  lower(name) like '%$party_name%' $whwre ";
+				$st_party = $db->prepare($query);
+                $st_party->execute();
+                $filing_no_data = $st_party->fetchAll();
+                $fiing_nos = '';
+                if (!empty($filing_no_data) && is_array($filing_no_data)) {
+                    foreach ($filing_no_data as $val) {
+                        $filiddd = $val["filing_no"];
+                        $fiing_nos .= "'$filiddd'" . ',';
+                    }
+                }
+                $fiing_nos = rtrim($fiing_nos, ',');
+
+                $filing_noss = " in( $fiing_nos)"; 
+                if($fiing_nos == '') { 
+                    $filing_noss = " = 'sssssss' ";
+                }
+
+				$cases = $case_obj->get_cases_additional_party_wise($db,$schema,$filing_noss);
+            }
+		}elseif($search_by_option == 'advocate_wise'){
+			$advocate_name = htmlspecialchars(htmlentities(strtolower($_POST['advocate_name'])));;
+			$case_year = htmlspecialchars(htmlentities($_POST['case_year']));
+			$whwre = '';
+            if ($case_year != 'All') {
+                $whwre = " and filing_no like '%$case_year' ";
+            }
+			$query = "SELECT (a.rep_code),a.filing_no FROM
+            public.e_more_representative as a
+                        join e_master_advocate as b ON a.rep_code = b.id
+                         where (a.filing_no != 'NA' AND a.filing_no is not null) and
+                         a.display = true and (b.rep_name != 'NA' OR b.rep_name is not null) and lower(b.rep_name) like '%$advocate_name%'  $whwre ";
+		   $st_party = $db->prepare($query);
+
+            $st_party->execute();
+            $filing_no_data = $st_party->fetchAll();
+            $fiing_nos = '';
+            if (!empty($filing_no_data) && is_array($filing_no_data)) {
+                foreach ($filing_no_data as $val) {
+                    $filiddd = $val["filing_no"];
+                    $fiing_nos .= "'$filiddd'" . ',';
+                }
+            }
+            $fiing_nos = rtrim($fiing_nos, ',');
+
+            $filing_noss = "in( $fiing_nos)"; 
+            if($fiing_nos == '') { 
+                $filing_noss = " = 'sssssss' ";
+            }
+			$cases = $case_obj->get_cases_advocated_wise($db,$schema,$filing_noss);
+		}else{
+			$response = array('status'=>0,'msg'=>'Something went wrong');
+			http_response_code(500);
+			echo json_encode($response,true);
+			die;
+		}
+		$response['data'] = $cases;
+		http_response_code(200);
+		echo json_encode($response,true);
+		die;
+	}
+
+	elseif($page == 'orders' || $page == 'judgements' || $page == 'judgements_orders'){
+		if($search_by_option == 'judges_member_wise'){
+			$judge_code = htmlspecialchars(htmlentities($_POST['judge_code']));
+			$case_type = htmlspecialchars(htmlentities($_POST['case_type']));
+			$category = htmlspecialchars(htmlentities($_POST['category']));
+			$from_date = htmlspecialchars(htmlentities($_POST['from_date']));
+			$to_date = htmlspecialchars(htmlentities($_POST['to_date']));
+			$data = $case_obj->get_orders_judgements_judge_wise($db,$schema,$page,$case_type,$judge_code,$category,$from_date,$to_date,$search_by_option);
+			
+		}elseif($search_by_option == 'case_no_wise'){
+			$case_no = htmlspecialchars(htmlentities($_POST['case_no']));
+			$case_type = htmlspecialchars(htmlentities($_POST['case_type']));
+			$case_year = htmlspecialchars(htmlentities($_POST['case_year']));
+			
+			$data = $case_obj->get_orders_judgements_case_no_wise($db,$schema,$page,$case_type,$case_no,$case_year);
+			
+		}elseif($search_by_option == 'efiling_no_wise'){
+			$filing_no = htmlspecialchars(htmlentities($_POST['filing_no']));
+			$data = $case_obj->get_orders_judgements_efiling_no_wise($db,$schema,$page,$filing_no);
+			
+		}elseif($search_by_option == 'order_date_wise'){
+			$case_type = htmlspecialchars(htmlentities($_POST['case_type']));
+			$category = htmlspecialchars(htmlentities($_POST['category']));
+			$from_date = htmlspecialchars(htmlentities($_POST['from_date']));
+			$to_date = htmlspecialchars(htmlentities($_POST['to_date']));
+			$data = $case_obj->get_orders_judgements_judge_wise($db,$schema,$page,$case_type,'',$category,$from_date,$to_date,$search_by_option);
+			
+		}elseif($search_by_option == 'free_text_wise'){
+			$exact_search_word = htmlspecialchars(htmlentities($_POST['exact_word_search']));
+            $text_name = htmlspecialchars(htmlentities(strtolower(trim($_POST['freetext']))));
+            $data_search =   "LOWER(od.order_html) like '%$text_name%'";
+            if($exact_search_word == '2') { 
+				$text_name = htmlspecialchars(htmlentities(trim($_POST['freetext'])));
+              $data_search =   "od.order_html like '%$text_name%'";
+            }
+			$data = $case_obj->get_orders_judgements_freetext_wise($db,$schema,$page,$data_search);
+			
+		}else{
+			$response = array('status'=>0,'msg'=>'Something went wrong');
+			http_response_code(500);
+			echo json_encode($response,true);
+			die;
+		}
+		
+		/*  http_response_code(200);
+		echo json_encode($data,true);
+		die;  */
+		
+		foreach($data as $k=>$value){
+			
+			$child_cases = $case_obj->get_child_cases_details($db,$schema,$value['filing_no']);
+			$data[$k]['connected_cases_ias'] = $child_cases;
+			$orders_or_judgements = $case_obj->get_orders_judgements($db,$schema,$page,$value['filing_no']);
+			$data[$k]['orders_judgements'] = $orders_or_judgements;
+			foreach($orders_or_judgements as $key=>$order){
+				$coram = $case_obj->get_coram($db, $schema, $order['date_of_judgement_order'],$order['bench_no']);
+				$data[$k]['orders_judgements'][$key]['coram'] = $coram;
+			}
+		}
+		$response['data'] = $data;
+		http_response_code(200);
+		echo json_encode($response,true);
+		die;
+	}else{
+		$response = array('status'=>500,'msg'=>'something went wrong');
+		http_response_code(500);
+		echo json_encode($response,true);
+		die;
+	}
+}
+
+if($search_type == 'view_details'){
+	$response = array('status'=>200,'msg'=>'success');
+	$filing_no = htmlspecialchars(htmlentities($_POST['filing_no']));
+	$case_details = $case_obj->get_case_details($db,$schema,$filing_no);
+	$main_case_ia_no = (!empty($case_details[0]['main_case_ia_no']))?$case_details[0]['main_case_ia_no']:'';
+	unset($case_details[0]['main_case_ia_no']);
+	unset($case_details[0][5]);
+	$applicant_parties = $case_obj->get_parties($db,$filing_no,$party_flag = 'P');
+	$respondant_parties = $case_obj->get_parties($db,$filing_no,$party_flag = 'R');
+	$legel_rep_pet_details = $case_obj->get_legal_representative_details($db,$filing_no,$party_flag = 'P');
+	$legel_rep_res_details = $case_obj->get_legal_representative_details($db,$filing_no,$party_flag = 'R');
+	$first_hearing_details = $case_obj->get_hearing_details($db,$schema,$filing_no,$type = 'first');
+	$last_hearing_details = $case_obj->get_hearing_details($db,$schema,$filing_no,$type = 'last');
+	if(!empty($first_hearing_details)){
+		$first_hearing_details = array_shift($first_hearing_details);
+		$first_listing_coram = $case_obj->get_coram($db, $schema, $first_hearing_details['hearing_date'],$first_hearing_details['bench_no']);
+		$first_hearing_details['coram'] = $first_listing_coram;
+	}
+
+	if(!empty($last_hearing_details)){
+		$last_hearing_details = array_shift($last_hearing_details);
+		$last_listing_coram = $case_obj->get_coram($db, $schema, $last_hearing_details['hearing_date'],$last_hearing_details['bench_no']);
+		$last_hearing_details['coram'] = $last_listing_coram;
+	}
+
+	$next_hearing_details = $last_hearing_details;
+	if(!empty($next_hearing_details['next_hearing_date'])){
+		$next_hearing_details['hearing_date'] = (!empty($next_hearing_details['next_hearing_date']))?$next_hearing_details['next_hearing_date']:'';
+	}
+	unset($next_hearing_details['next_hearing_date']);
+	unset($next_hearing_details['bench_no']);
+	unset($next_hearing_details[3]);
+	unset($next_hearing_details[4]);
+	unset($first_hearing_details['next_hearing_date']);
+	unset($first_hearing_details['bench_no']);
+	unset($first_hearing_details[3]);
+	unset($first_hearing_details[4]);
+	unset($last_hearing_details['next_hearing_date']);
+	unset($last_hearing_details['bench_no']);
+	unset($last_hearing_details[3]);
+	unset($last_hearing_details[4]);
+	$case_history = $case_obj->get_case_history($db,$schema,$filing_no);
+	$order_data = $case_obj->get_order_history($db,$schema,$filing_no);
+
+	$child_cases = $case_obj->get_child_cases_details($db,$schema,$filing_no);
+	
+	$connected_cases =  $case_obj->get_connected_cases($db,$schema,$filing_no,$status = 'C',$display = true);
+	$response['data']['case_details'] = $case_details;
+	$response['data']['party_details']['applicant_name'] = $applicant_parties;
+	$response['data']['party_details']['respondant_name'] = $respondant_parties;
+	$response['data']['legal_representative']['applicant_legal_representative_name'] = $legel_rep_pet_details;
+	$response['data']['legal_representative']['respondent_legal_representative_name'] = $legel_rep_res_details;
+	$response['data']['first_hearing_details'] = $first_hearing_details;
+	$response['data']['last_hearing_details'] = $last_hearing_details;
+	$response['data']['next_hearing_details'] = $next_hearing_details;
+	$response['data']['case_history'] = $case_history;
+	$response['data']['order_history'] = $order_data;
+	$response['data']['ias_other_application'] = $child_cases;
+	$response['data']['connected_cases'] = $connected_cases;
+	http_response_code(200);
+	echo json_encode($response,true);
+	die;
+}
+
+if($search_type == 'get_listing_details'){
+	$response = array('status'=>200,'msg'=>'success');
+	$filing_no = htmlspecialchars(htmlentities($_POST['filing_no']));
+	$listing_date = htmlspecialchars(htmlentities($_POST['listing_date']));
+	$hearing_details = $case_obj->get_hearing_info($db,$schema,$filing_no,$listing_date);
+	if(!empty($hearing_details)){
+		$hearing_details = array_shift($hearing_details);
+		$coram = $case_obj->get_coram($db, $schema, $hearing_details['hearing_date'],$hearing_details['bench_no']);
+		$hearing_details['coram'] = $coram;
+	}
+	$response['data'] = $hearing_details;
+	http_response_code(200);
+	echo json_encode($response,true);
+	die;
+}
+
+if($search_type == 'view_order'){
+	$response = array('status'=>200,'msg'=>'success');
+	$filing_no = htmlspecialchars(htmlentities($_POST['filing_no']));
+	$order_date = htmlspecialchars(htmlentities($_POST['order_date']));
+	$order_path = $case_obj->get_order_path($db,$schema,$filing_no,$order_date);
+	echo $order_path;
+	if (!empty($order_path)) {
+		$file = time().'.pdf';
+		header('Content-Type: application/pdf');
+		header('Content-Disposition: inline; filename="'.basename($file).'"');
+		readfile($order_path); 
+	} else { 
+	  echo 'No documnt';
+	}
+	die;
+}
+
+
+
+$response = array('status'=>500,'msg'=>'something went wrong');
+http_response_code(500);
+echo json_encode($response,true);
+die;
+
+

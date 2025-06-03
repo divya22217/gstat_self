@@ -1,0 +1,19 @@
+<?php
+/* ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);  */ 
+$path = $_REQUEST['path'];
+$path = urldecode($_REQUEST['path']);
+if (!empty($path) && (strstr($path, '/Efile_Document/GSTAT_Documents/CIS_Documents/casedoc/') || strstr($path, '/Efile_Document/GSTAT_Documents/ncltdoc/casedoc/'))) {
+	$path = urldecode($path);
+$filename=time();
+header('Content-type:application/pdf');
+header('Content-disposition: inline; filename="'.$filename.'"');
+@ readfile($path);
+
+
+} else{
+echo "not found";
+}
+
+ ?>

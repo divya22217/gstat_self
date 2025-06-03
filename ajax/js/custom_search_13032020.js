@@ -1,0 +1,96 @@
+
+function fn_case_dfr_type(value) {
+    $("#case_dfr_div_id").empty();
+    $('.load_container').show();
+    var data = {};
+    data['action'] = 'select_case_status';
+    data['search_by'] = value;
+    $.ajax({
+        type: "POST",
+        url: "ajax/ajax.php",
+        data: data,
+        dataType: "html",
+        success: function (data) {
+            $("#case_dfr_div_id").html(data);
+            $('.load_container').hide();
+        },
+        error: function (request, error) {
+            alert("something error. please try again");
+        }
+    });
+}
+
+function fn_search_by_case_dfr() {
+    var valid = $("#form_id_case_status").valid();
+    if (valid) {
+        $('.load_container').show();
+        var data = {};
+        data['action'] = 'case_status_search';
+        data['search_by'] = $("#form_id_case_status #search_by").val();
+        data['case_type'] = $("#form_id_case_status #case_type").val();
+        data['case_number'] = $("#form_id_case_status #case_number").val();
+        data['case_year'] = $("#form_id_case_status #case_year").val();
+        data['diary_no'] = $("#form_id_case_status #diary_no").val();
+        data['party_name'] = $("#form_id_case_status #party_name").val();
+        $.ajax({
+            type: "POST",
+            url: "ajax/ajax.php",
+            data: data,
+            dataType: "html",
+            success: function (data) {
+                $('.load_container').hide();
+                $("#view_case1111").modal('show');
+                $("#view_case_type_details").html(data);
+            },
+            error: function (request, error) {
+                alert("something error");
+                $('.load_container').hide();
+            }
+        });
+    }
+}
+function fn_case_details(filing_no) {
+    $('.load_container').show();
+    var data = {};
+    data['action'] = 'case_status_case_details';
+    data['filing_no'] = filing_no;
+    $.ajax({
+        type: "POST",
+        url: "ajax/ajax.php",
+        data: data,
+        dataType: "html",
+        success: function (data) {
+            $('.load_container').hide();
+            $("#div_case_details_popup").html(data);
+        },
+        error: function (request, error) {
+            alert("something error");
+            $('.load_container').hide();
+        }
+    });
+    $("#case_details_popup").modal('show');
+}
+
+function fn_case_details_hearing(filing_no,listing_date) {
+    $('.load_container').show();
+    var data = {};
+    data['action'] = 'case_status_case_details_hearing';
+    data['filing_no'] = filing_no;
+    data['listing_date'] = listing_date;
+    $.ajax({
+        type: "POST",
+        url: "ajax/ajax.php",
+        data: data,
+        dataType: "html",
+        success: function (data) {
+            $('.load_container').hide();
+            $("#div_case_details_popup_hearing").html(data);
+        },
+        error: function (request, error) {
+            alert("something error");
+            $('.load_container').hide();
+        }
+    });
+    $("#case_details_popup_hearing").modal('show');
+}
+
