@@ -581,18 +581,19 @@ function popsurety_pending_report(cfy)
 		{
 				var filing_no = $("#filing_no").val();
 				let search_type = $('input[name="search_type"]:checked').val();
-				 var leng = $('#filing_no').val().length;
-				 if(leng == 16)
-				 {
-					let search_type = $('input[name="search_type"]:checked').val();
-					if(filing_no!==''){
-					search_data('search_filing_no',1,search_type,'','','','','',filing_no); 
-					}
-					else{
-						search_data('reset_cases',100,search_type,'','','','','',''); 
-						
-					}
+				  var leng = $('#filing_no').val().length;
+				  if(leng == 16 )
+				  {
+						let search_type = $('input[name="search_type"]:checked').val();
+						if(filing_no!==''){
+						search_data('search_filing_no',1,search_type,'','','','','',filing_no); 
+						}
 				}
+				else{
+						search_data('reset_cases',100,search_type,'','','','','',''); 
+					
+				}
+					
 				 
 				
 				
