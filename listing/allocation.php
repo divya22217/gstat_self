@@ -389,6 +389,13 @@ function popsurety_pending_report(cfy)
 									</select>
 								</div>
 							</div>
+							<!--------------Filing Search-------------------->
+							<div class="col-sm-4 col-md-4 col-lg-4">
+								<label for="filing_no" class="col-sm-4 col-form-label"><font color="red">*</font></span></font>Filing No</label>
+								<div class="col-sm-8"><input type="text" id="filing_no" class="form-control" name="filing_no" value=""  onkeyUp="return search_by_filing();"></div>
+								
+							</div> 
+							<!--------------Filing Search-------------------->
 							<!--<div class="col-sm-4 col-md-4 col-lg-4">
 								<button type="button" class="btn btn-primary" onClick="return show_all();">Show All Fresh Cases</button><span>
 								<button type="button" class="btn btn-warning" onClick="return reset_all();">Reset to selection wise</button></span>
@@ -568,12 +575,35 @@ function popsurety_pending_report(cfy)
 			search_data('case_no_search',1,search_type,'','',search_case_type,search_case_year,search_case_number); 
 			
 		}
+
+		/********************Search BY Filing No*************************/
+		function search_by_filing()
+		{
+				var filing_no = $("#filing_no").val();
+				let search_type = $('input[name="search_type"]:checked').val();
+				 var leng = $('#filing_no').val().length;
+				 if(leng == 16)
+				 {
+					let search_type = $('input[name="search_type"]:checked').val();
+					if(filing_no!==''){
+					search_data('search_filing_no',1,search_type,'','','','','',filing_no); 
+					}
+					else{
+						search_data('reset_cases',100,search_type,'','','','','',''); 
+						
+					}
+				}
+				 
+				
+				
+		}
+			/********************Search BY Filing No*************************/
 		
-		function search_data(type,item_per_page,search_type,listing_date,court_no,search_case_type,search_case_year,search_case_no){
+		function search_data(type,item_per_page,search_type,listing_date,court_no,search_case_type,search_case_year,search_case_no,filing_no=''){
 		$.ajax({
 		type: "POST",
 		url: "get_all_cases_count.php",
-		data: {type:type,search_type:search_type,listing_date:listing_date,court_no:court_no,search_case_type:search_case_type,search_case_year:search_case_year,search_case_no:search_case_no},
+		data: {type:type,search_type:search_type,listing_date:listing_date,court_no:court_no,search_case_type:search_case_type,search_case_year:search_case_year,search_case_no:search_case_no,filing_no:filing_no},
 		success: function (total_items) { 
 		   $('.pagination').pagination({
 			items: total_items,
@@ -582,11 +612,11 @@ function popsurety_pending_report(cfy)
 			currentPage : 1,
 			onPageClick : function(pageNumber) {
 				jQuery("#search_data_here").html('<center>loading...</center>');
-				jQuery("#search_data_here").load("get_cases_for_allocation.php?page=" + pageNumber+"&limit="+ item_per_page+"&type="+type+"&search_type="+search_type+"&listing_date="+listing_date+"&court_no="+court_no+"&search_case_type="+search_case_type+"&search_case_year="+search_case_year+"&search_case_no="+search_case_no);
+				jQuery("#search_data_here").load("get_cases_for_allocation.php?page=" + pageNumber+"&limit="+ item_per_page+"&type="+type+"&search_type="+search_type+"&listing_date="+listing_date+"&court_no="+court_no+"&search_case_type="+search_case_type+"&search_case_year="+search_case_year+"&search_case_no="+search_case_no+"&filing_no="+filing_no);
 			},
 			onInit :function() {
 				jQuery("#search_data_here").html('loading...');
-				jQuery("#search_data_here").load("get_cases_for_allocation.php?page=1&limit="+ item_per_page+"&type="+type+"&search_type="+search_type+"&listing_date="+listing_date+"&court_no="+court_no+"&search_case_type="+search_case_type+"&search_case_year="+search_case_year+"&search_case_no="+search_case_no);
+				jQuery("#search_data_here").load("get_cases_for_allocation.php?page=1&limit="+ item_per_page+"&type="+type+"&search_type="+search_type+"&listing_date="+listing_date+"&court_no="+court_no+"&search_case_type="+search_case_type+"&search_case_year="+search_case_year+"&search_case_no="+search_case_no+"&filing_no="+filing_no);
 			}
 		});
 		$("#all_records").val(total_items);

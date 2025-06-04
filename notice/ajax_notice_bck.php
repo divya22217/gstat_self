@@ -109,7 +109,7 @@ function year_list($year)
 
     
 
-function fn_sms_notice($db_online, $schema, $type, $filing_no, $email_subject, $mobile_msg, $email_text, $notice_id,$notice_pdf)
+function fn_sms_notice($db_online, $schema, $type, $filing_no, $email_subject, $mobile_msg, $email_text, $notice_id)
 {
 
     try {
@@ -188,13 +188,14 @@ try {
             // die;
         }
         //-----------------------------Representative----------------------//
+       
         $cur_date = date('Y-m-d');
 
        // $link = '';
        // if ($type == '112') {
          //   $link = base64_encode($sr_no_notice_id);
 	// }
-	 $link = base64_encode($sr_no_notice_id.'/'.$schema);
+	 $link = base64_encode($sr_no_notice_id);
         $email_text = $email_text . '.  <a download="download" href="https://uat-cis.gstat.gov.in/gstat/notice_view.php?notice_id=' . $link . '" target = "_blank"> click here </a> This is a computer generated message, Please do not reply';
         if (!empty($data_main) && is_array($data_main)) {
             foreach ($data_main as $val) {
@@ -205,7 +206,7 @@ try {
                 $query = "insert into sms(filing_no,mobile,mobile_msg,email_id,email_subject,email_text,
                 name,sms_flag,send_flag,entry_date,sms_type,party_flag,pdf_path)
                 VALUES('$filing_no','$mobile','$mobile_msg','$email_id','$email_subject',
-                '$email_text','$name','N',0,'$cur_date','$type','$party_flag','$notice_pdf')";
+                '$email_text','$name','N',0,'$cur_date','$type','$party_flag',$notice_pdf)";
                 try {
                     $sql_query = $db_online->prepare($query);
                     $sql_query->execute();
@@ -340,6 +341,7 @@ function summon_formate($db, $party_ids, $summon_type, $schemas, $data)
 </head>
 
 <body style="font-size:16px; font-family: Arial, Helvetica, sans-serif; line-height: 1.2; padding-left: 50px; margin: 0;">
+<img src="receipt_watermark.png" class="watermark">
     <p style="text-align:center; line-height: 1.0; color: #666; font-size: 12px;">&nbsp;</p>
     <p style="text-align:center; line-height: 0.5; font-size: 22px;"><b>GSTAT</b></p>
     <p style="text-align:center; line-height: 0.1;font-size: 22px;"><b>'. $_SESSION['bench_name'] .'</b></p>
@@ -470,6 +472,7 @@ return array('notice_html'=>$messahe_data,'coram'=>array(),'listing_date'=>'');
 </head>
 
 <body style="font-size:16px; font-family: Arial, Helvetica, sans-serif; line-height: 1.2; padding-left: 50px; margin: 0;">
+<img src="receipt_watermark.png" class="watermark">
     <p style="text-align:center; line-height: 1.0; color: #666; font-size: 12px;">&nbsp;</p>
     <p style="text-align:center; line-height: 1.0; color: #666; font-size: 12px;">&nbsp;</p>
     <p style="text-align:center; line-height: 0.5; font-size: 22px;"><b>GSTAT</b></p>
@@ -601,6 +604,7 @@ return array('notice_html'=>$messahe_data,'coram'=>array(),'listing_date'=>'');
 </head>
 
 <body style="font-size:16px; font-family: Arial, Helvetica, sans-serif; line-height: 1.2; padding-left: 50px; margin: 0;">
+<img src="receipt_watermark.png" class="watermark">
     <p style="text-align:center; line-height: 1.0; color: #666; font-size: 12px;">&nbsp;</p>
     <p style="text-align:center; line-height: 1.0; color: #666; font-size: 12px;">&nbsp;</p>
     <p style="text-align:center; line-height: 0.5; font-size: 22px;"><b>GSTAT</b></p>
@@ -734,6 +738,7 @@ return array('notice_html'=>$messahe_data,'coram'=>array(),'listing_date'=>'');
 </head>
 
 <body style="font-size:16px; font-family: Arial, Helvetica, sans-serif; line-height: 1.2; padding-left: 50px; margin: 0;">
+<img src="receipt_watermark.png" class="watermark">
     <p style="text-align:center; line-height: 1.0; color: #666; font-size: 12px;">&nbsp;</p>
     <p style="text-align:center; line-height: 1.0; color: #666; font-size: 12px;">&nbsp;</p>
     <p style="text-align:center; line-height: 0.5; font-size: 22px;"><b>GSTAT</b></p>
@@ -885,6 +890,7 @@ return array('notice_html'=>$messahe_data,'coram'=>array(),'listing_date'=>'');
 </head>
 
 <body style="font-size:16px; font-family: Arial, Helvetica, sans-serif; line-height: 1.2; padding-left: 50px; margin: 0;">
+<img src="receipt_watermark.png" class="watermark">
     <p style="text-align:center; line-height: 1.0; color: #666; font-size: 12px;">&nbsp;</p>
     <p style="text-align:center; line-height: 1.0; color: #666; font-size: 12px;">&nbsp;</p>
     <p style="text-align:center; line-height: 0.5; font-size: 22px;"><b>GSTAT</b></p>
@@ -1016,6 +1022,7 @@ return array('notice_html'=>$messahe_data,'coram'=>array(),'listing_date'=>'');
 </head>
 
 <body style="font-size:16px; font-family: Arial, Helvetica, sans-serif; line-height: 1.2; padding-left: 50px; margin: 0;">
+<img src="receipt_watermark.png" class="watermark">
     <p style="text-align:center; line-height: 1.0; color: #666; font-size: 12px;">&nbsp;</p>
     <p style="text-align:center; line-height: 1.0; color: #666; font-size: 12px;">&nbsp;</p>
     <p style="text-align:center; line-height: 0.5; font-size: 22px;"><b>GSTAT</b></p>
@@ -1308,7 +1315,7 @@ if ($_SESSION['user'] != '' and $_SESSION['location'] != '') {
 
                         // $data_notice = get_data($db, $schema . '.notice_creation_details', array('filing_no' => $value['filing_no']), array(), '*', 'id desc');
                         $fgdfdf = 0;
-                        $query_notice = "select to_party_id,digital_sign_status,notice_type,type_formate,today_date,id,pdf_path from  $schema.notice_creation_details where filing_no = '" . $value['filing_no'] . "' and  digital_sign_status NOT IN(3) order by id desc";
+                        $query_notice = "select to_party_id,digital_sign_status,notice_type,type_formate,today_date,id from  $schema.notice_creation_details where filing_no = '" . $value['filing_no'] . "' and  digital_sign_status NOT IN(3) order by id desc";
                         $query_prepare_notice = $db->prepare($query_notice);
                         $query_prepare_notice->execute();
                         $data_notice = $query_prepare_notice->fetchAll();
@@ -1333,8 +1340,7 @@ if ($_SESSION['user'] != '' and $_SESSION['location'] != '') {
                                 }
                                 $digital_sign_status = $value_notice['digital_sign_status'];
                                 $notice_type = $value_notice['notice_type'];
-				$type_formate = $value_notice['type_formate'];
-				$notice_pdf_path = $value_notice['pdf_path'];
+                                $type_formate = $value_notice['type_formate'];
 
                                 $notice = 'Notice';
                                 if (in_array($notice_type, array('3', '4', '5'))) {
@@ -1355,7 +1361,7 @@ if ($_SESSION['user'] != '' and $_SESSION['location'] != '') {
 
             <td> <?php echo date('d/m/Y', strtotime($value_notice['today_date'])); ?></td>
             <td>
-                <a href="../scrutiny/readpdf.php?path=<?php  echo urlencode($notice_pdf_path); ?>" target="_blank"
+                <a href="../notice_view.php?notice_id=<?php echo base64_encode($value_notice['id']); ?>" target="_blank"
                     class="text-primary"><i class="fa fa-eye"></i> View <?php echo $notice; ?></a> |
                 <button onclick="fn_trash_notice('<?php echo $value_notice['id']; ?>')" class="text-danger btn-none"> <i
                         class="fa fa-trash"></i> Delete</button>
@@ -1486,36 +1492,33 @@ if ($_SESSION['user'] != '' and $_SESSION['location'] != '') {
             $file_name_dat = $file_name . '.pdf';
             $data_notice = summon_formate($db, $to_party_id, $_REQUEST['notice_type'], $schema, $arra_data);
             $html_pdf = $data_notice['notice_html'];
-
             //---------Notice PDF creation---------------//
             try{
              $dompdf->loadHtml($html_pdf);
-              $dompdf->setPaper('A4');
-              $dompdf->render();
-              $outputff = $dompdf->output();
-              $upload_dir = "/Efile_Document/GSTAT_Documents/CIS_Documents/casedoc/notice/".$_POST['notice_type'];
-              $pp_path = $upload_dir."/$file_name_dat";
-              $save_path = $upload_dir."/$file_name_dat";
-              if (!file_exists($save_path)) {
-                    mkdir($upload_dir, 0777, true);
-                        }
-             $save_file = file_put_contents($pp_path, $outputff);
-              
-              $s3Service = new S3Service();
-              $s3Service->uploadDynamicFile($outputff, $save_path);
-            }catch (Exception $e) {
+			  $dompdf->setPaper('A4');
+			  $dompdf->render();
+			  $outputff = $dompdf->output();
+			  $upload_dir = "/Efile_Document/GSTAT_Documents/CIS_Documents/casedoc/notice/".$_POST['notice_type'];
+			  $pp_path = $upload_dir."/$file_name_dat";
+			  $save_path = $upload_dir."/$file_name_dat";
+			  if (!file_exists($save_path)) {
+					mkdir($upload_dir, 0777, true);
+	                   	}
+			 $save_file = file_put_contents($pp_path, $outputff);
+			  
+			  $s3Service = new S3Service();
+			  $s3Service->uploadDynamicFile($outputff, $save_path);
+            }catch (PDOException $e) {
                 error_log("Error generating or uploading PDF: " . $e->getMessage());
-                echo $msg = 'Error generating or uploading PDF:' . $e;
-                die;
+                echo $msg = '>Error in generating or uploading PDF' . $e; die;
             }
 
             //----------Notice PDF creation--------------//
-
             $before_bench = (!empty($data_notice['coram']))?$data_notice['coram']:'';
             $listing_date = (!empty($data_notice['listing_date']))?$data_notice['listing_date']:null;
             $blank = '';
             $query = "INSERT INTO $schema.notice_creation_details (sr_no_notice,sr_no,sr_no_year,notice_html,file_name,type_formate,filing_no, case_no, case_type, case_year, location,send_date, notice_type, notice_date, today_date, user_id, to_party_id, seal_of_court_date,whereason_date,written_statement_date,appear_court_date,petion_againts_desc,before_bench,listing_date,compilence,ask_document_person,time_to_present,name_of_documents,notice_html_data,pdf_path) values
-            (?,?,?,?,?,?,?,?,?,?,?,now(),?,now(),now(),?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+            (?,?,?,?,?,?,?,?,?,?,?,now(),?,now(),now(),?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
             try {
                 $db->beginTransaction(); 
@@ -1552,7 +1555,7 @@ if ($_SESSION['user'] != '' and $_SESSION['location'] != '') {
                     $subject = "Notice Sr. No. :" . $sr_no_noticeqqq;
                     $email_text = "Dear User, you can get the copy of notice by the link below. ";
                     $msg555 = "Dear User, you can get the notice in registered mail id. please check your mail id. ";
-                    fn_sms_notice($db, $schema, 'N', $data[0]['filing_no'], $subject, $msg555, $email_text, $sr_no_noticeqqq,$save_path);
+                    fn_sms_notice($db, $schema, 'N', $data[0]['filing_no'], $subject, $msg555, $email_text, $sr_no_noticeqqq);
                 }
                 $db->commit();
                  echo json_encode(array('party_ids' => $to_party_id, 'filing_no' => $data[0]['filing_no'], 'file_name' => $file_name, 'schema' => $schema, 'notice_type' => $_POST['notice_type'], 'data' => $arra_data));
