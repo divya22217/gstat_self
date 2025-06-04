@@ -2120,3 +2120,22 @@ function get_crn_detail($db,$filing_no){
     $gst_data = $gst_detail->fetch();
     return $gst_data;
 }
+//---------------------------Notification--------------------------------//
+// To split the sentence upto a number of Words Done By Divya 
+function getFirstWords($text, $limit = 10)
+ {
+    $words = preg_split('/\s+/', trim($text));
+    $firstWords = array_slice($words, 0, $limit);
+    return implode(' ', $firstWords);
+}
+function getUser($db,$schema_id,$user_court,$menu_accesscode)
+{
+    
+    $UserDetail = $db->prepare("SELECT id from users_cis where schema_id=?  AND court=? AND menuaccess_codeall=?");
+    $UserDetail->bindParam(1, $schema_id, PDO::PARAM_INT);
+    $UserDetail->bindParam(2, $user_court, PDO::PARAM_INT);
+    $UserDetail->bindParam(3, $menu_accesscode, PDO::PARAM_INT);
+    $UserDetail->execute();
+    $detail = $UserDetail->fetch(PDO::FETCH_ASSOC);
+    return $detail;
+}

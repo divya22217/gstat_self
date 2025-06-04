@@ -1,9 +1,14 @@
 <?php
+
 date_default_timezone_set("Asia/Kolkata");
-include("./db_inc1.php");
+include("db_inc1.php");
+
+include("./notifications/Notification.php");
+
 session_start();
 $_SESSION['user'];
 $_SESSION['location'];
+
 $leveladd = $_SESSION['level_level'];
 $localadmin = $_SESSION['localadmin'];
 $main_id = $_SESSION['main_id'];
@@ -14,6 +19,11 @@ if(!is_numeric($userid)){
   echo "invalid User ID";
   die();
 }
+
+ $notification_list=getNotifications($db,$userid);
+ // print_r($notification_list);die;
+ $notifications=$notification_list['data'];
+
 
 if ($_SESSION['user'] == '' and $_SESSION['location'] == '') {
   echo "Access Problem.....";
@@ -35,20 +45,13 @@ if (empty($_SESSION['user']) and $_SESSION['location'] == '') {
 
 if ($_SESSION['user'] != '' and $_SESSION['location'] != '') {
 
-
-
   // This code not use next time .......	Schema session create Hear....
-
-
   $sessionUserType = htmlspecialchars($_SESSION['id']);
-
-
   $curYear = htmlspecialchars(date("Y"));
   $curMonth = htmlspecialchars(date("m"));
   $curDay = htmlspecialchars(date("d"));
   $cur_date = "$curYear-$curMonth-$curDay";
   $cur_date1 = "$curDay/$curMonth/$curYear";
-
 
   $link_scrutiny_idaccess = '1';
 
@@ -60,6 +63,8 @@ if ($_SESSION['user'] != '' and $_SESSION['location'] != '') {
   ?>
 
   <style>
+    
+
     .topheader {
       background: #f7e0bb;
       text-align: center;
@@ -160,6 +165,42 @@ if ($_SESSION['user'] != '' and $_SESSION['location'] != '') {
         padding-bottom: 9px;
       }
     }
+
+    .card {
+  /* Add shadows to create the "card" effect */
+  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+  transition: 0.3s;
+}
+
+/* On mouse-over, add a deeper shadow */
+.card:hover {
+  box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2);
+}
+
+/* Add some padding inside the card container */
+.containers {
+        width: 170px;
+    }
+.containers {
+  padding: 2px 16px;
+}
+
+.icon {
+  width: 30px;
+  height: 30px;
+  position: relative;
+}
+
+.txt {
+  background-color: red;
+  font-size: xx-small;
+  position: absolute;
+  padding: 2px;
+  top: 5px;
+  left: 5px;
+  border-radius: 25px;
+}
+
   </style>
 
   <!-- Header Navbar: style can be found in header.less -->
@@ -237,52 +278,56 @@ if ($_SESSION['user'] != '' and $_SESSION['location'] != '') {
     </ul>
 
     <div class="navbar-custom-menu">
-
+   
       <ul class="nav navbar-nav">
         <!-- Messages: style can be found in dropdown.less-->
-
-        <li>
-          <a href="#" class="dropdown-toggle" data-toggle="dropdown">
-
-
-            <?php
-
-            ?>
-            </span>
-          </a>
-          <ul class="dropdown-menu">
-            <li class="header"></li>
-            <li>
-              <!-- inner menu: contains the actual data -->
-              <ul class="menu">
-                <li><!-- start message -->
-                  <a href="#">
-                    <div class="pull-left">
-                      <i class="fa fa-list-alt"></i>
-                    </div>
-                    <h4>
-
-                      <small><i></i> </small>
-                    </h4>
-                    <p></p>
-                  </a>
-                </li>
-                <!-- end message -->
-
-            </li>
-
-          </ul>
+       <?php
+     
+          if($_SESSION['menuaccess_codeall']!= 3 && $_SESSION['menuaccess_codeall']!= 4){ ?>
+          <li> 
+              <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                <!----------Notification Icon (21-04-25)---->
+            
+                <div class="icon">
+                    <i class="fa fa-bell" style="font-size:20px;color: #c7c2c2;"></i>
+                    <?php if($notification_list['total']!=0){ ?>
+                      <div class="txt"><?php echo $notification_list['total'];?></div>
+                    <?php }?>
+                </div>
+            
+              
+              </a>
+            <ul class="dropdown-menu" style="width:350px;">
+              
+              <div style="text-align: right;" class="notifi_open" ><a href="./notifications/AllNotification.php" target="_blank">See All</a></div>
+                <li>
+                  <!-- inner menu: contains the actual data -->
+                  <ul class="menu"style="list-style-type: disc;color:green;margin-left:0px;">
+                    <?php foreach($notifications as $notifi){ 
+                      ?>
+                    <li ><!-- start message -->
+                        <div class="card" style="padding: 2px;">
+                          
+                              <p style="color:black;"><?php  echo getFirstWords($notifi['message']);?>...<a <?php if($notifi['is_read']==false){ ?> onClick="readNotifi(<?php echo $notifi['msg_id']; ?>);"<?php }?> target="_blank" href="./notifications/notification_detail.php?msgId=<?php echo $notifi['msg_id']; ?>"> Read More</a> </p>
+                          
+                        </div> 
+                      <!-- </a> -->
+                    </li>
+                    <?php }?>
+                    <!-- end message -->
+                  </ul>
+              </li>
+            
+              <li class="footer"><a href="#"></a></li>
+            </ul>
+    
         </li>
-
-
-
-        <li class="footer"><a href="#"></a></li>
-      </ul>
-      </li>
+        <?php }?>
       <!-- Notifications: style can be found in dropdown.less -->
       <li class="dropdown notifications-menu">
         <a href="#" class="dropdown-toggle" data-toggle="dropdown">
           <i></i>
+         
 
 
           </span>
@@ -394,3 +439,22 @@ if ($_SESSION['user'] != '' and $_SESSION['location'] != '') {
 <?php
 }
 ?>
+<script>
+ function readNotifi(msg_id)
+ {
+
+  $.ajax({
+    type:'POST',
+    url:'notifications/Notification.php?function="change_status"&msg_id='+ msg_id,
+    success:function(response){
+console.log(response);
+      alert(response);
+      return false;
+    },
+    error: function(xhr, status, error) {
+					//alert(error);
+				}
+
+  });
+ }
+  </script>

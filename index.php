@@ -139,7 +139,6 @@
 
 	include_once('custom/custom_function.php');
 
-
 	$_SESSION['user'];
 
 	$_SESSION['location'];
@@ -746,5 +745,40 @@
 
 	</div>
 </div>
+
+<script>
+	$(document).ready(function(e){
+		
+		var cis_user_id =<?php echo $_SESSION['id']; ?>;
+		var court =<?php echo $_SESSION['user_court']; ?>;
+		var schema_id =<?php echo $_SESSION['schema_idccc']; ?>;
+		var menu_accesscode=<?php echo  $_SESSION['menuaccess_codeall'];?>;
+		var schemas ='<?php echo  $_SESSION['schema_name'];?>';
+		//console.log(schemas);
+		
+		$.ajax({
+			type:'POST',
+			url:'notifications/Notification.php',
+			data:{
+				method:"saveReminder",
+				cis_user_id:cis_user_id,
+				court:court,
+				schema_id:schema_id,
+				schemas:schemas,
+				menu_accesscode:menu_accesscode
+			},
+			success:function(response){
+				console.log(response);
+				 e.preventDefault();
+				return false;
+			},
+			error: function(xhr, status, error) {
+					//alert(error);
+				}
+			
+		})
+	});
+
+	</script>
 
 </html>

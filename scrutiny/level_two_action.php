@@ -48,8 +48,6 @@ function get_order_detail($db,$filing_no){
     return $data;
 }
 
-
-
 $auto_manual = htmlspecialchars($_REQUEST['auto_manual']);
 
 $form_status = htmlspecialchars($_REQUEST['form_status']);
@@ -102,6 +100,8 @@ $main_id=$_SESSION['main_id'];
 $schemas=htmlspecialchars($_SESSION['schema_name']);
 $username = $_SESSION['actual_username'];
 $userid=$_SESSION['id'];
+$user_court = $_SESSION['user_court'];
+ $schema_id=$_SESSION['schema_idccc'];
 $report_party_type = htmlspecialchars($_REQUEST['report_party_type']);
 if($_SESSION['user'] == '' and $_SESSION['location'] =='')
 {
@@ -444,6 +444,41 @@ $update_draft_display=$db->prepare("update $schemas.draft_objection_details set 
 $save_fn=$db->prepare("insert into $schemas.case_no_generation (filing_no) values (?)");
 $save_fn->bindParam(1, $filing_no, PDO::PARAM_STR);
 $save_fn->execute();
+
+//-------------------------Instant Notification ------------------------
+$menu_access_code=6;
+$user=getUser($db,$schema_id,$user_court,$menu_access_code);
+$receiver_id=$user['id'];
+$bench_data = get_bench_name($db,$location_access);
+$bench_name = $bench_data['city_name'];
+$username=ucfirst($username);
+$message='Re Scrutiny has been done by '.$username.' for  Appeal no:- '.$filing_no.' at  '.$bench_name.'  Bench,Please proceed with Case generation.';
+$sender_id =0;
+$type="Notification";
+$category="Case No Generation";
+$sql = "INSERT INTO notifications
+		(receiver_id,sender_id, filing_no, schema_id,type,category,message,court_id) 
+		VALUES 
+		(?,?,?,?,?,?,?)";
+
+try {
+	$stmt = $db->prepare($sql);
+	$stmt->bindParam(1, $receiver_id, PDO::PARAM_INT);
+	$stmt->bindParam(2, $sender_id, PDO::PARAM_INT);
+	$stmt->bindParam(3, $filing_no, PDO::PARAM_STR);
+	$stmt->bindParam(4, $schema_id, PDO::PARAM_INT);
+	$stmt->bindParam(5, $type, PDO::PARAM_STR);
+	$stmt->bindParam(6, $category,PDO::PARAM_STR);
+	$stmt->bindParam(7, $message, PDO::PARAM_STR);
+	$stmt->bindParam(8, $user_court, PDO::PARAM_INT);
+	$stmt->execute();
+
+} catch (PDOException $e) {
+   
+	return false;
+}
+//-------------------------End Instant Notification------------------------
+
 
 	
 $db->commit();

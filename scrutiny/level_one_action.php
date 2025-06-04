@@ -15,7 +15,7 @@ header("Cache-Control=proxy-revalidate");
 
  ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
-error_reporting(E_ALL); 
+//error_reporting(E_ALL); 
 
 date_default_timezone_set("Asia/Kolkata");
 include("../db_inc1.php");
@@ -37,7 +37,8 @@ $cause_no = $_REQUEST['cause_no'];
 $location_access = $_SESSION['location'];
 $user_court = $_SESSION['user_court'];
  $cnt_len1=count($cause_no);
-
+ $schema_id=$_SESSION['schema_idccc'];
+//echo "<pre>";print_r($_SESSION);die;('divya');
 
 for($h=0;$h<$cnt_len1;$h++)
 {
@@ -288,7 +289,9 @@ $st21s->execute();
 	$insert->bindParam(8, $sccc, PDO::PARAM_STR);
 	$insert->bindParam(9, $case_type, PDO::PARAM_STR);
     $insert->execute(); 
+
 }
+
 
 $st13=$db->prepare("insert into  $schemas.scrutiny_his (filing_no,defects,notification_date,user_id,level_level,username)
         values (?,?,?,?,?,?) ");
@@ -299,6 +302,38 @@ $st13->bindParam(4, $sessionUserType, PDO::PARAM_STR);
 $st13->bindParam(5, $ll, PDO::PARAM_STR);
 $st13->bindParam(6, $usernam, PDO::PARAM_STR);
 $st13->execute();
+
+
+/******** Instant Notification******/
+        $menu_access_code=11;
+        $user=getUser($db,$schema_id,$user_court,$menu_access_code);
+        $receiver_id=$user['id'];
+        $message='Level one  Scrutiny has been done by '.$username.' for  appeal no '.$filing_no.',Please Perform Re-scrutiny within alloted Time';
+        $sender_id =0;
+        $type="Notification";
+        $category="Scrutiny";
+        $sql = "INSERT INTO notifications
+                (receiver_id,sender_id, filing_no, schema_id,type,category,message,court_id) 
+                VALUES 
+                (?,?,?,?,?,?,?)";
+
+        try {
+            $stmt = $db->prepare($sql);
+            $stmt->bindParam(1, $receiver_id, PDO::PARAM_INT);
+            $stmt->bindParam(2, $sender_id, PDO::PARAM_INT);
+            $stmt->bindParam(3, $filing_no, PDO::PARAM_STR);
+            $stmt->bindParam(4, $schema_id, PDO::PARAM_INT);
+            $stmt->bindParam(5, $type, PDO::PARAM_STR);
+            $stmt->bindParam(6, $category, PDO::PARAM_STR);
+            $stmt->bindParam(7, $message, PDO::PARAM_STR);
+            $stmt->bindParam(8, $user_court, PDO::PARAM_INT);
+            $stmt->execute();
+          //  return true;
+        } catch (PDOException $e) {
+           
+            return false;
+        }
+/******** Instant Notification******/
 
 $scrutiny_dc='0';
 $scr_display='1';
