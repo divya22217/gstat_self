@@ -219,9 +219,25 @@ if($_SESSION['user'] !='' && $_SESSION['location'] !='')
 		$res = $sql1->fetchAll();
 		
 	}
-	
+	/**********Search using filing no*********/
+	if($type == 'search_filing_no'){
+		$search_filing_no = $data['filing_no'];
+		
+		$count = $start_from;
+		$query = "select a.filing_no,a.case_no,a.case_type,a.case_year,a.pet_name,a.res_name,ecd.dt_of_filing,a.location_code,a.regis_date,a.main_case_ia_no, a.list_with_defect,
+					s.first_listing_date,s.first_court_no,ecd.patially_defective from $schemas.case_detail as a left join $schemas.scrutiny as s on s.filing_no = a.filing_no
+					inner join e_case_detail as ecd on ecd.filing_no = a.filing_no
+					where (a.case_no is NOT NULL OR a.case_no != '') and (a.case_year is NOT NULL OR a.case_year != '')  and ecd.filing_no = ? $user_court_query $napa_query order by CASE WHEN a.case_no ~ '^\d+$' THEN 1  ELSE 2 END, CASE WHEN a.case_no ~ '^\d+$' THEN CAST(a.case_no AS INTEGER) ELSE NULL END,a.case_type,a.regis_date desc limit $limit offset $start_from";
+		
+		$sql1=$db->prepare($query);
+		$sql1->bindParam(1, $search_filing_no, PDO::PARAM_STR);
+		$sql1->execute();
+		$res = $sql1->fetchAll();
+		
+	}
+	/**************End*********/
 	$total_records = count($res);
-	if($type == 'all_cases' || $type == 'by_court_and_listing_date' || $type == 'reset_cases' || $type == 'case_no_search') {
+	if($type == 'all_cases' || $type == 'by_court_and_listing_date' || $type == 'reset_cases' || $type == 'case_no_search' || $type == 'search_filing_no') {
 		if(!empty($res)){
 		foreach ($res as $k=>$row1)
 		{
