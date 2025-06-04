@@ -418,6 +418,12 @@ img.captcha {
 		            <label>&nbsp;</label>
 		            <button type="button" onclick="get_causelist()" class="btn btn-primary"><i class="fa fa-search"></i>
 		                Search</button>
+                         <!---------Print Button ----------->
+                    <div id="print_button" style="display:none;">
+                        <button type="button"  onclick=" printDiv('case_dfr_div_id')" class="btn btn-danger"><i class="fa fa-print"></i>
+                            Print</button> 
+                    </div>
+                 <!---------Print Button----------->
 		        </div>
                 <div id="case_dfr_div_id"></div>
             </form>
@@ -453,6 +459,19 @@ $location = isset($_REQUEST['location']) ? $_REQUEST['location'] : 'delhipb';
     });
     </script>
     <script type="text/javascript" src="ajax/js/custom_search.js?v=2.1"></script>
+    <script>
+  
+function printDiv(divId) {
+    var content = document.getElementById(divId).innerHTML;
+    var myWindow = window.open('', '', 'width=800,height=600');
+    myWindow.document.write('<html><head><title>CauseList</title></head><body>' + content + '</body></html>');
+    myWindow.document.close();
+    myWindow.onload = function () {
+        myWindow.print();
+        myWindow.close();
+    };
+}
+</script>
 
 </body>
 

@@ -185,6 +185,7 @@ function get_causelist(){
         dataType: "html",
         success: function (data) {
             $("#case_dfr_div_id").html(data);
+             $('#print_button').show();
             $('.load_container').hide();
             $(".captcha").attr("src", "captcha.php?_=" + ((new Date()).getTime()));
         },
