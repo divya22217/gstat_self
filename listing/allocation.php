@@ -391,8 +391,13 @@ function popsurety_pending_report(cfy)
 							</div>
 							<!--------------Filing Search-------------------->
 							<div class="col-sm-4 col-md-4 col-lg-4">
-								<label for="filing_no" class="col-sm-4 col-form-label"><font color="red">*</font></span></font>Filing No</label>
-								<div class="col-sm-8"><input type="text" id="filing_no" class="form-control" name="filing_no" value=""  onkeyUp="return search_by_filing();"></div>
+							  
+									<label for="filing_no" class="col-sm-2 col-form-label"><font color="red">*</font></span></font>Filing No</label>
+									<span id="error_msg"></span>
+									<div class="col-sm-5"><input type="text" id="filing_no" class="form-control" name="filing_no" value="" ></div>
+									<button type="button"  onClick=" return search_by_filing();" class="btn btn-primary">Search</button>
+									<button type="button" id="reset_button" class="btn btn-warning" onClick="return reset_all();">Reset</button>
+							  
 								
 							</div> 
 							<!--------------Filing Search-------------------->
@@ -579,25 +584,29 @@ function popsurety_pending_report(cfy)
 		/********************Search BY Filing No*************************/
 		function search_by_filing()
 		{
-				var filing_no = $("#filing_no").val();
-				let search_type = $('input[name="search_type"]:checked').val();
-				  var leng = $('#filing_no').val().length;
+		
+			var filing_no = $("#filing_no").val();
+			let search_type = $('input[name="search_type"]:checked').val();
+			 var leng = $('#filing_no').val().length;
+			
+				if(leng == 0)
+				{
+					$('#error_msg').html('<font color="red">Please Enter Filing No</font>');	 
+					return false;
+				}
+		
 				  if(leng == 16 )
 				  {
-						let search_type = $('input[name="search_type"]:checked').val();
+						$('#error_msg').html();
 						if(filing_no!==''){
 						search_data('search_filing_no',1,search_type,'','','','','',filing_no); 
 						}
-				}
-				else{
-						search_data('reset_cases',100,search_type,'','','','','',''); 
-					
-				}
-					
-				 
-				
+						
+				  }	
 				
 		}
+		
+		
 			/********************Search BY Filing No*************************/
 		
 		function search_data(type,item_per_page,search_type,listing_date,court_no,search_case_type,search_case_year,search_case_no,filing_no=''){
@@ -631,11 +640,17 @@ function popsurety_pending_report(cfy)
 }
 		
 		function reset_all(){
+			
 			$("#search_data_here").html('<center>Loading...</center>');
+			$('#error_msg').html();
+			$('#filing_no').val('');
 			listing_date = $("#from_list_date").val();
 			court_no = $("#court_no").val();
 			let search_type = $('input[name="search_type"]:checked').val();
-			search_data('reset_cases',100,search_type,listing_date,court_no);
+			
+			//search_data('reset_cases',100,search_type,listing_date,court_no,'','','',''); 
+			search_data('all_cases',100,search_type,listing_date,court_no,'','','',''); 
+			
 			/* $.ajax({
             type: "POST",
             url: "get_cases_for_allocation.php",

@@ -90,6 +90,22 @@ $data = $_REQUEST;
 		$sql1->execute();
 		$res = $sql1->fetchColumn();
 	}
+	/**********Search using filing no*********/
+	if($type == 'search_filing_no'){
+		$search_filing_no = $data['filing_no'];
+		$count = 0;
+		$query = "select count(*) as count from $schemas.case_detail as a left join $schemas.scrutiny as s on s.filing_no = a.filing_no
+					left join e_case_detail as ecd on ecd.filing_no = a.filing_no
+					where (a.case_no is NOT NULL OR a.case_no != '') and (a.case_year is NOT NULL OR a.case_year != '') and (a.case_type is NOT NULL  and a.case_type != 60) and 
+					(a.location_code is NOT NULL) and  (a.legal_aid IS NULL OR a.legal_aid = 'NULL')  and ecd.filing_no = ? $user_court_query $napa_query";
+		
+		$sql1=$db->prepare($query);
+		$sql1->bindParam(1, $search_filing_no, PDO::PARAM_STR);
+		$sql1->execute();
+		$res = $sql1->fetchColumn();
+		
+	}
+	/**************End*********/
 	
 	echo $res; die;
 	
